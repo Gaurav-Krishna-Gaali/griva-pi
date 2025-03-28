@@ -8,6 +8,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // Add state variable for active tab
+  bool _showUpcoming = true;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,7 +68,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.08),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -93,23 +96,29 @@ class _HomePageState extends State<HomePage> {
                   child: _buildActionCard(
                     icon: Icons.folder_outlined,
                     title: 'Patient Database',
-                    subtitle: '',
+                    subtitle: ' ',
                     color: Color(0xFFF5E6FF),
                     iconColor: Colors.black87,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.08),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Row(
                     children: [
-                      _buildTab("Upcoming Appointments", true, '8'),
+                      GestureDetector(
+                        onTap: () => setState(() => _showUpcoming = true),
+                        child: _buildTab("Upcoming Appointments", _showUpcoming, '8'),
+                      ),
                       SizedBox(width: 24),
-                      _buildTab("Pending Diagnosis", false, '9'),
+                      GestureDetector(
+                        onTap: () => setState(() => _showUpcoming = false),
+                        child: _buildTab("Pending Diagnosis", !_showUpcoming, '9'),
+                      ),
                     ],
                   ),
                 ),
@@ -119,25 +128,31 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final cardWidth = 320.0; // Fixed base width for cards
+                  final cardWidth = 320.0;
                   return SingleChildScrollView(
                     child: Column(
                       children: [
                         SizedBox(
-                          height: 180, // Adjust this height based on your card's content
+                          height: 180,
                           child: Stack(
                             children: [
                               SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(
                                   children: [
-                                    _buildPatientCard(cardWidth),
-                                    SizedBox(width: 16),
-                                    _buildPatientCard(cardWidth),
-                                    SizedBox(width: 16), 
-                                    _buildPatientCard(cardWidth),
-                                    SizedBox(width: 16), 
-                                    _buildPatientCard(cardWidth),
+                                    if (_showUpcoming) ...[
+                                      _buildPatientCard(cardWidth),
+                                      SizedBox(width: 16),
+                                      _buildPatientCard(cardWidth),
+                                      SizedBox(width: 16),
+                                      _buildPatientCard(cardWidth),
+                                      SizedBox(width: 16),
+                                      _buildPatientCard(cardWidth),
+                                    ] else ...[
+                                      _buildPatientCard(cardWidth, isPending: true),
+                                      SizedBox(width: 16),
+                                      _buildPatientCard(cardWidth, isPending: true),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -204,7 +219,7 @@ class _HomePageState extends State<HomePage> {
             title,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
           ),
@@ -263,7 +278,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildPatientCard(double width) {
+  Widget _buildPatientCard(double width, {bool isPending = false}) {
     return Container(
       width: width,
       padding: EdgeInsets.all(16),
@@ -319,7 +334,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {},
-                  child: Text('Start Exam'),
+                  child: Text(isPending ? 'Review' : 'Start Exam'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF8B44F7),
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
