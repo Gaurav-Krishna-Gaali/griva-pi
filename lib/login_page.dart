@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'home_page.dart';
 
 class GrivaLoginPage extends StatefulWidget {
   const GrivaLoginPage({Key? key}) : super(key: key);
@@ -51,8 +52,7 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
               TextButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  // Navigate to home page or dashboard
-                  // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
                 },
                 child: Text('OK'),
               ),
