@@ -118,49 +118,58 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final cardWidth = constraints.maxWidth * 0.28; // Match action card width
-                  return Stack(
-                    children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildPatientCard(cardWidth),
-                            SizedBox(width: 10),
-                            _buildPatientCard(cardWidth),
-                            SizedBox(width: 10), 
-                            _buildPatientCard(cardWidth),
-                            SizedBox(width: 10), 
-                            _buildPatientCard(cardWidth),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 40,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                Colors.white.withOpacity(0),
-                                Colors.white,
-                              ],
-                            ),
+                  final cardWidth = 320.0; // Fixed base width for cards
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 180, // Adjust this height based on your card's content
+                          child: Stack(
+                            children: [
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildPatientCard(cardWidth),
+                                    SizedBox(width: 16),
+                                    _buildPatientCard(cardWidth),
+                                    SizedBox(width: 16), 
+                                    _buildPatientCard(cardWidth),
+                                    SizedBox(width: 16), 
+                                    _buildPatientCard(cardWidth),
+                                  ],
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                      colors: [
+                                        Colors.white.withOpacity(0),
+                                        Colors.white,
+                                      ],
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Color(0xFF8B44F7),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Center(
-                            child: Icon(
-                              Icons.arrow_forward_ios,
-                              color: Color(0xFF8B44F7),
-                              size: 20,
-                            ),
-                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
