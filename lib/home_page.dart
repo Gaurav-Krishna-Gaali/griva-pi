@@ -116,48 +116,53 @@ class _HomePageState extends State<HomePage> {
             ),
             SizedBox(height: 24),
             Expanded(
-              child: Stack(
-                children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildPatientCard(),
-                        SizedBox(width: 10),
-                        _buildPatientCard(),
-                        SizedBox(width: 10), 
-                        _buildPatientCard(),
-                        SizedBox(width: 10), 
-                        _buildPatientCard(),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 40,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.white.withOpacity(0),
-                            Colors.white,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = constraints.maxWidth * 0.28; // Match action card width
+                  return Stack(
+                    children: [
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildPatientCard(cardWidth),
+                            SizedBox(width: 10),
+                            _buildPatientCard(cardWidth),
+                            SizedBox(width: 10), 
+                            _buildPatientCard(cardWidth),
+                            SizedBox(width: 10), 
+                            _buildPatientCard(cardWidth),
                           ],
                         ),
                       ),
-                      child: Center(
-                        child: Icon(
-                          Icons.arrow_forward_ios,
-                          color: Color(0xFF8B44F7),
-                          size: 20,
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 40,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.white.withOpacity(0),
+                                Colors.white,
+                              ],
+                            ),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              Icons.arrow_forward_ios,
+                              color: Color(0xFF8B44F7),
+                              size: 20,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             )
           ],
@@ -249,9 +254,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-    Widget _buildPatientCard() {
+  Widget _buildPatientCard(double width) {
     return Container(
-      width: 280,
+      width: width,
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -265,7 +270,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             '[Patient\'s Name]',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: width * 0.06, // Responsive font size
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -273,41 +278,46 @@ class _HomePageState extends State<HomePage> {
           Text(
             'Patient ID',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: width * 0.05, // Responsive font size
               color: Colors.grey[600],
             ),
           ),
           Text(
             'Age',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: width * 0.05, // Responsive font size
               color: Colors.grey[600],
             ),
           ),
           SizedBox(height: 12),
           Row(
             children: [
-              TextButton(
-                onPressed: () {},
-                child: Text('Details'),
-                style: TextButton.styleFrom(
-                  backgroundColor: Colors.grey[200],
-                  foregroundColor: Colors.grey[700],
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: TextButton(
+                  onPressed: () {},
+                  child: Text('Details'),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: Colors.grey[700],
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
-              SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () {},
-                child: Text('Start Exam'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF8B44F7),
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {},
+                  child: Text('Start Exam'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF8B44F7),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
@@ -317,5 +327,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
 }
