@@ -25,7 +25,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             Image.asset(
               'assets/images/logo.png',
-              height: 32, // Fixed height for better proportions
+              height: 36, // Fixed height for better proportions
             ),
             SizedBox(width: 8), // Fixed spacing
             Text(
@@ -53,68 +53,69 @@ class _HomePageState extends State<HomePage> {
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              "Hello Doctor [Name]!",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+            Center(
+              child: Text(
+                "Hello Doctor [Name]!",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
             ),
-            SizedBox(height: 32),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.05),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildActionCard(
-                  icon: Icons.person_outline,  // Changed icon
-                  title: 'New Patient',
-                  subtitle: 'Register a new patient',
-                  color: Color(0xFFE6F0FF),
-                  iconColor: Colors.black87,  // Added icon color
+                Expanded(
+                  child: _buildActionCard(
+                    icon: Icons.person_outline,
+                    title: 'New Patient',
+                    subtitle: 'Register a new patient',
+                    color: Color(0xFFE6F0FF),
+                    iconColor: Colors.black87,
+                  ),
                 ),
-                _buildActionCard(
-                  icon: Icons.assignment_outlined,  // Changed icon
-                  title: 'Start Exam',
-                  subtitle: 'Begin patient consultation',
-                  color: Color(0xFFE6FFE6),
-                  iconColor: Colors.black87,
+                SizedBox(width: 16),
+                Expanded(
+                  child: _buildActionCard(
+                    icon: Icons.assignment_outlined,
+                    title: 'Start Exam',
+                    subtitle: 'Begin patient consultation',
+                    color: Color(0xFFE6FFE6),
+                    iconColor: Colors.black87,
+                  ),
                 ),
-                _buildActionCard(
-                  icon: Icons.folder_outlined,  // Changed icon
-                  title: 'Patient Database',
-                  subtitle: '',
-                  color: Color(0xFFF5E6FF),
-                  iconColor: Colors.black87,
+                SizedBox(width: 16),
+                Expanded(
+                  child: _buildActionCard(
+                    icon: Icons.folder_outlined,
+                    title: 'Patient Database',
+                    subtitle: '',
+                    color: Color(0xFFF5E6FF),
+                    iconColor: Colors.black87,
+                  ),
                 ),
               ],
             ),
-            SizedBox(height: 32),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.05),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    _buildTab("Upcoming Appointments", true, '8'),
-                    SizedBox(width: 24),
-                    _buildTab("Pending Diagnosis", false, '9'),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      _buildTab("Upcoming Appointments", true, '8'),
+                      SizedBox(width: 24),
+                      _buildTab("Pending Diagnosis", false, '9'),
+                    ],
+                  ),
                 ),
-                // Add search field
-                // Expanded(
-                //   child: TextField(
-                //     decoration: InputDecoration(
-                //       hintText: 'Search patient/ID',
-                //       prefixIcon: Icon(Icons.search, color: Colors.grey),
-                //       border: UnderlineInputBorder(),
-                //       contentPadding: EdgeInsets.symmetric(vertical: 8),
-                //     ),
-                //   ),
-                // ),
               ],
             ),
-            SizedBox(height: 24),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.03),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -188,7 +189,6 @@ class _HomePageState extends State<HomePage> {
     required Color iconColor,
   }) {
     return Container(
-      width: MediaQuery.of(context).size.width * 0.28,
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color,
@@ -203,7 +203,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
@@ -212,7 +212,7 @@ class _HomePageState extends State<HomePage> {
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 color: Colors.grey[600],
               ),
             ),
