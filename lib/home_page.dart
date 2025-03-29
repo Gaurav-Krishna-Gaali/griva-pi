@@ -46,13 +46,93 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: Icon(Icons.settings, color: Color(0xFF8B44F7)),
-            onPressed: () {},
+            offset: Offset(0, 56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            color: Colors.white,
+            shadowColor: Color(0xFF8B44F7),
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem<String>(
+                value: 'wifi',
+                child: _buildPopupMenuItem(Icons.wifi, 'Wifi'),
+              ),
+              PopupMenuItem<String>(
+                value: 'microphone',
+                child: _buildPopupMenuItem(Icons.mic, 'Microphone'),
+              ),
+              PopupMenuItem<String>(
+                value: 'bluetooth',
+                child: _buildPopupMenuItem(Icons.bluetooth, 'Bluetooth'),
+              ),
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: _buildPopupMenuItem(Icons.logout, 'Logout'),
+              ),
+            ],
+            onSelected: (String value) {
+              // Handle menu item selection
+              switch (value) {
+                case 'wifi':
+                  // Handle Wifi selection
+                  break;
+                case 'microphone':
+                  // Handle Microphone selection
+                  break;
+                case 'bluetooth':
+                  // Handle Bluetooth selection
+                  break;
+                case 'logout':
+                  // Handle logout
+                  break;
+              }
+            },
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: Icon(Icons.person_outline, color: Color(0xFF8B44F7)),
-            onPressed: () {},
+            offset: Offset(0, 56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            color: Colors.white,
+            shadowColor: Color(0xFF8B44F7),
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem<String>(
+                value: 'profile',
+                child: _buildPopupMenuItem(Icons.person_outline, 'Profile'),
+              ),
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: _buildPopupMenuItem(Icons.settings_outlined, 'Settings'),
+              ),
+              PopupMenuItem<String>(
+                value: 'support',
+                child: _buildPopupMenuItem(Icons.help_outline, 'Customer support'),
+              ),
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: _buildPopupMenuItem(Icons.logout, 'Logout'),
+              ),
+            ],
+            onSelected: (String value) {
+              // Handle menu item selection
+              switch (value) {
+                case 'profile':
+                  // Navigate to profile
+                  break;
+                case 'settings':
+                  // Navigate to settings
+                  break;
+                case 'support':
+                  // Navigate to support
+                  break;
+                case 'logout':
+                  // Handle logout
+                  break;
+              }
+            },
           ),
         ],
       ),
@@ -354,6 +434,23 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPopupMenuItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.grey[600], size: 20),
+        SizedBox(width: 12),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }
