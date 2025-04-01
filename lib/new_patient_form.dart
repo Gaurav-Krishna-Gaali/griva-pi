@@ -14,8 +14,9 @@ class NewPatientForm extends StatefulWidget {
 class _NewPatientFormState extends State<NewPatientForm> {
   final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _dateOfVisitController = TextEditingController();
-  final TextEditingController _lastMenstrualDateController = TextEditingController();
-  
+  final TextEditingController _lastMenstrualDateController =
+      TextEditingController();
+
   // Add state variables for smoking and blood group
   String? _smokingValue;
   String? _selectedBloodGroup = 'Dropdown'; // Default value
@@ -25,21 +26,21 @@ class _NewPatientFormState extends State<NewPatientForm> {
   String? _selectedContraception = 'Dropdown';
   String? _selectedHIVStatus = 'Dropdown';
   String? _selectedHPVVaccination = 'Dropdown';
-  
+
   // Add counters for pregnancy history
   int _liveBirths = 0;
   int _stillBirths = 0;
   int _abortions = 0;
   int _cesareans = 0;
   int _miscarriages = 0;
-  
+
   // New state variables for Colposcopy Specific Details
   String? _hpvTestValue;
   String? _hpvResultValue;
   TextEditingController _hpvDateController = TextEditingController();
   String? _hcgTestValue;
   TextEditingController _hcgDateController = TextEditingController();
-  
+
   @override
   void dispose() {
     _dateOfBirthController.dispose();
@@ -49,15 +50,18 @@ class _NewPatientFormState extends State<NewPatientForm> {
     _hcgDateController.dispose();
     super.dispose();
   }
-  
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+  ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
     );
-    
+
     if (picked != null) {
       setState(() {
         controller.text = DateFormat('MM/dd/yyyy').format(picked);
@@ -100,7 +104,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
           }
         },
       ),
-        
+
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -116,13 +120,24 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'New Patient Form',
-                          style: TextStyle(
-                            color: Colors.purple,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.purple,
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            const Text(
+                              'New Patient Form',
+                              style: TextStyle(
+                                color: Colors.purple,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -135,7 +150,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                             ),
                             Text(
-                              DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+                              DateFormat(
+                                'MMMM dd, yyyy',
+                              ).format(DateTime.now()),
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 16,
@@ -143,7 +160,6 @@ class _NewPatientFormState extends State<NewPatientForm> {
                             ),
                           ],
                         ),
-                        
                       ],
                     ),
                   ],
@@ -172,7 +188,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Row 1: Patient Name and ID
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,7 +249,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Row 2: Date of Birth and Visit
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +269,11 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               TextFormField(
                                 controller: _dateOfBirthController,
                                 readOnly: true,
-                                onTap: () => _selectDate(context, _dateOfBirthController),
+                                onTap:
+                                    () => _selectDate(
+                                      context,
+                                      _dateOfBirthController,
+                                    ),
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(4),
@@ -284,7 +304,11 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               TextFormField(
                                 controller: _dateOfVisitController,
                                 readOnly: true,
-                                onTap: () => _selectDate(context, _dateOfVisitController),
+                                onTap:
+                                    () => _selectDate(
+                                      context,
+                                      _dateOfVisitController,
+                                    ),
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(4),
@@ -302,7 +326,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Row 3: Mobile No and Email
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,7 +389,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Row 4: Address
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,7 +417,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Row 5: Doctor's Name and Referred By
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,7 +483,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // New General Medical History Section in a Card
               Container(
                 decoration: BoxDecoration(
@@ -481,7 +505,10 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     const Center(
                       child: Text(
                         'General Medical History',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -512,7 +539,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                   
+
                     Row(
                       children: [
                         Expanded(
@@ -522,13 +549,25 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               const Text('Blood Group'),
                               DropdownButton<String>(
                                 value: _selectedBloodGroup,
-                                items: <String>['Dropdown', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
-                                    .map<DropdownMenuItem<String>>((String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                }).toList(),
+                                items:
+                                    <String>[
+                                      'Dropdown',
+                                      'A+',
+                                      'A-',
+                                      'B+',
+                                      'B-',
+                                      'O+',
+                                      'O-',
+                                      'AB+',
+                                      'AB-',
+                                    ].map<DropdownMenuItem<String>>((
+                                      String value,
+                                    ) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value),
+                                      );
+                                    }).toList(),
                                 onChanged: (String? newValue) {
                                   setState(() {
                                     _selectedBloodGroup = newValue;
@@ -569,7 +608,6 @@ class _NewPatientFormState extends State<NewPatientForm> {
               // New Reproductive & Obstetric History Section in a Card
               const SizedBox(height: 24),
               Container(
-                
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
@@ -582,14 +620,22 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 20),
+                padding: const EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 20,
+                  bottom: 20,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Center(
                       child: Text(
                         'Reproductive & Obstetric History',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -603,7 +649,8 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               const Text('Menopause: '),
                               const SizedBox(width: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
                                 children: [
                                   Row(
                                     children: [
@@ -614,7 +661,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                                           setState(() {
                                             _menopauseValue = value;
                                           });
-                                        }
+                                        },
                                       ),
                                       const Text('Yes'),
                                     ],
@@ -628,7 +675,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                                           setState(() {
                                             _menopauseValue = value;
                                           });
-                                        }
+                                        },
                                       ),
                                       const Text('No'),
                                     ],
@@ -642,12 +689,18 @@ class _NewPatientFormState extends State<NewPatientForm> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Last Menstrual Date (If not menopausal)'),
+                              const Text(
+                                'Last Menstrual Date (If not menopausal)',
+                              ),
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: _lastMenstrualDateController,
                                 readOnly: true,
-                                onTap: () => _selectDate(context, _lastMenstrualDateController),
+                                onTap:
+                                    () => _selectDate(
+                                      context,
+                                      _lastMenstrualDateController,
+                                    ),
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(),
                                   contentPadding: const EdgeInsets.all(8.0),
@@ -659,10 +712,10 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                       ],
                     ),
-                    
+
                     // New fields from the image
                     const SizedBox(height: 16),
-                    
+
                     // Sexually Active row
                     Row(
                       children: [
@@ -689,9 +742,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         const Text('No'),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Contraceptions and HIV Status row
                     Row(
                       children: [
@@ -703,15 +756,25 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               DropdownButton<String>(
                                 isExpanded: true,
                                 value: _selectedContraception,
-                                items: <String>[
-                                  'Dropdown', 'None', 'Condoms', 'Pills', 'IUD', 
-                                  'Implant', 'Injection', 'Sterilization', 'Other'
-                                ].map<DropdownMenuItem<String>>((String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                }).toList(),
+                                items:
+                                    <String>[
+                                      'Dropdown',
+                                      'None',
+                                      'Condoms',
+                                      'Pills',
+                                      'IUD',
+                                      'Implant',
+                                      'Injection',
+                                      'Sterilization',
+                                      'Other',
+                                    ].map<DropdownMenuItem<String>>((
+                                      String value,
+                                    ) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value),
+                                      );
+                                    }).toList(),
                                 onChanged: (String? newValue) {
                                   setState(() {
                                     _selectedContraception = newValue;
@@ -730,14 +793,20 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               DropdownButton<String>(
                                 isExpanded: true,
                                 value: _selectedHIVStatus,
-                                items: <String>[
-                                  'Dropdown', 'Positive', 'Negative', 'Unknown'
-                                ].map<DropdownMenuItem<String>>((String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                }).toList(),
+                                items:
+                                    <String>[
+                                      'Dropdown',
+                                      'Positive',
+                                      'Negative',
+                                      'Unknown',
+                                    ].map<DropdownMenuItem<String>>((
+                                      String value,
+                                    ) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value),
+                                      );
+                                    }).toList(),
                                 onChanged: (String? newValue) {
                                   setState(() {
                                     _selectedHIVStatus = newValue;
@@ -749,9 +818,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // B. Pregnancy and Birth History section
                     const Text(
                       'B. Pregnancy and Birth History',
@@ -760,9 +829,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Pregnant row
                     Row(
                       children: [
@@ -789,14 +858,16 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         const Text('No'),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Counter rows
                     Row(
                       children: [
                         Expanded(
-                          child: _buildCounter('Live Births', _liveBirths, (value) {
+                          child: _buildCounter('Live Births', _liveBirths, (
+                            value,
+                          ) {
                             setState(() {
                               _liveBirths = value;
                             });
@@ -804,7 +875,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildCounter('Still Births', _stillBirths, (value) {
+                          child: _buildCounter('Still Births', _stillBirths, (
+                            value,
+                          ) {
                             setState(() {
                               _stillBirths = value;
                             });
@@ -812,7 +885,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildCounter('Abortions', _abortions, (value) {
+                          child: _buildCounter('Abortions', _abortions, (
+                            value,
+                          ) {
                             setState(() {
                               _abortions = value;
                             });
@@ -820,13 +895,15 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     Row(
                       children: [
                         Expanded(
-                          child: _buildCounter('Cesareans', _cesareans, (value) {
+                          child: _buildCounter('Cesareans', _cesareans, (
+                            value,
+                          ) {
                             setState(() {
                               _cesareans = value;
                             });
@@ -834,18 +911,22 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildCounter('Miscarriages', _miscarriages, (value) {
+                          child: _buildCounter('Miscarriages', _miscarriages, (
+                            value,
+                          ) {
                             setState(() {
                               _miscarriages = value;
                             });
                           }),
                         ),
-                        const Expanded(child: SizedBox()), // Empty space for alignment
+                        const Expanded(
+                          child: SizedBox(),
+                        ), // Empty space for alignment
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // C. Immunization History section
                     const Text(
                       'C. Immunization History',
@@ -854,9 +935,9 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -864,14 +945,20 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         DropdownButton<String>(
                           isExpanded: true,
                           value: _selectedHPVVaccination,
-                          items: <String>[
-                            'Dropdown', 'None', 'Gardasil', 'Cervarix', 'Gardasil 9', 'Unknown'
-                          ].map<DropdownMenuItem<String>>((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            );
-                          }).toList(),
+                          items:
+                              <String>[
+                                'Dropdown',
+                                'None',
+                                'Gardasil',
+                                'Cervarix',
+                                'Gardasil 9',
+                                'Unknown',
+                              ].map<DropdownMenuItem<String>>((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value),
+                                );
+                              }).toList(),
                           onChanged: (String? newValue) {
                             setState(() {
                               _selectedHPVVaccination = newValue;
@@ -886,7 +973,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
 
               // Footer
               const SizedBox(height: 20),
-              
+
               // New Colposcopy Specific Details Section
               const SizedBox(height: 24),
               Container(
@@ -909,7 +996,10 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     const Center(
                       child: Text(
                         'Colposcopy Specific Details',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -951,8 +1041,8 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     // HPV Test
                     Row(
                       children: [
-                    const Text('HPV Test'),
-                    SizedBox(width: 10,),
+                        const Text('HPV Test'),
+                        SizedBox(width: 10),
                         Radio<String>(
                           value: 'Yes',
                           groupValue: _hpvTestValue,
@@ -1076,15 +1166,53 @@ class _NewPatientFormState extends State<NewPatientForm> {
                 ),
               ),
 
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      // Add save and edit logic here
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Save and Edit'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Add save and start exam logic here
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Save and Start Exam'),
+                  ),
+                ],
+              ),
+
               // Footer
               const SizedBox(height: 20),
               Center(
                 child: Text(
                   '© 2025 Griya. All rights reserved.',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ),
               const SizedBox(height: 20),
@@ -1094,7 +1222,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
       ),
     );
   }
-  
+
   // Helper method to build consistent counter widgets
   Widget _buildCounter(String label, int value, Function(int) onChanged) {
     return Row(
@@ -1113,16 +1241,11 @@ class _NewPatientFormState extends State<NewPatientForm> {
                 icon: const Icon(Icons.remove, size: 16),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: value > 0 
-                  ? () => onChanged(value - 1)
-                  : null,
+                onPressed: value > 0 ? () => onChanged(value - 1) : null,
               ),
               SizedBox(
                 width: 32,
-                child: Text(
-                  value.toString(),
-                  textAlign: TextAlign.center,
-                ),
+                child: Text(value.toString(), textAlign: TextAlign.center),
               ),
               IconButton(
                 icon: const Icon(Icons.add, size: 16),
