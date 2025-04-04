@@ -49,23 +49,21 @@ class MJPEGViewer extends StatefulWidget {
 class _MJPEGViewerState extends State<MJPEGViewer> {
   late String currentFrameUrl;
   Timer? timer;
+  bool isConnected = false;
 
   @override
   void initState() {
     super.initState();
-    currentFrameUrl = widget.streamUrl + "?time=${DateTime.now().millisecondsSinceEpoch}";
-
-    timer = Timer.periodic(Duration(milliseconds: 100), (_) {
-      setState(() {
-        currentFrameUrl = widget.streamUrl + "?time=${DateTime.now().millisecondsSinceEpoch}";
-      });
+    currentFrameUrl = widget.streamUrl;
+    
+    // Reduced refresh rate to 30fps (approximately)
+    timer = Timer.periodic(Duration(milliseconds: 33), (_) {
+      if (mounted) {
+        setState(() {
+          currentFrameUrl = widget.streamUrl + "?t=${DateTime.now().millisecondsSinceEpoch}";
+        });
+      }
     });
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
   }
 
   @override
@@ -74,13 +72,38 @@ class _MJPEGViewerState extends State<MJPEGViewer> {
       currentFrameUrl,
       gaplessPlayback: true,
       fit: BoxFit.contain,
+      headers: {
+        'Accept': 'multipart/x-mixed-replace; boundary=frame',
+        'Connection': 'keep-alive',
+      },
       loadingBuilder: (context, child, progress) {
-        return progress == null
-            ? child
-            : const Center(child: CircularProgressIndicator());
+        if (progress == null) {
+          isConnected = true;
+          return child;
+        }
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Connecting to stream...'),
+            ],
+          ),
+        );
       },
       errorBuilder: (context, error, stackTrace) {
-        return Center(child: Text('Failed to load stream'));
+        isConnected = false;
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red),
+              SizedBox(height: 16),
+              Text('Failed to connect to stream\nPlease check if the server is running'),
+            ],
+          ),
+        );
       },
     );
   }
