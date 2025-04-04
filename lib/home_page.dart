@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:griva_pi/custom_app_bar.dart';
 import 'new_patient_form.dart';
 import 'custom_drawer.dart';
+import 'exam_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -87,13 +88,18 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SizedBox(width: 16),
                 Expanded(
+                  child:GestureDetector(
+                    onTap: (){
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => PiCameraScreen()),
+                      );
+                    },
                   child: _buildActionCard(
                     icon: Icons.assignment_outlined,
                     title: 'Start Exam',
                     subtitle: 'Begin patient consultation',
                     color: Color(0xFFE6FFE6),
                     iconColor: Colors.black87,
-                  ),
+                  ),)
                 ),
                 SizedBox(width: 16),
                 Expanded(
