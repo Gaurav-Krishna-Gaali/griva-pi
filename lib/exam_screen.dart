@@ -1,19 +1,17 @@
 import 'package:http/http.dart' as http;
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class PiCameraScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    const streamUrl = "http://127.0.0.1:5000/video_feed";
+    const streamUrl = "http://127.0.0.1:5000/video_feed";  // Replace with your actual Pi camera stream URL
 
     return Scaffold(
       appBar: AppBar(title: Text("Raspberry Pi Stream")),
       body: Column(
         children: [
           Expanded(
-            child: WebViewStream(url: streamUrl),
+            child: WebViewStream(url: streamUrl),  // Displays live video stream
           ),
           ElevatedButton(
             onPressed: triggerAutofocus,
@@ -25,35 +23,28 @@ class PiCameraScreen extends StatelessWidget {
   }
 }
 
-class WebViewStream extends StatefulWidget {
+class WebViewStream extends StatelessWidget {
   final String url;
   const WebViewStream({Key? key, required this.url}) : super(key: key);
 
   @override
-  State<WebViewStream> createState() => _WebViewStreamState();
-}
-
-class _WebViewStreamState extends State<WebViewStream> {
-  late final WebViewController controller;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadRequest(Uri.parse(widget.url));
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return WebViewWidget(
-      controller: controller,
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(child: CircularProgressIndicator());
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return Center(child: Text("Failed to load video stream"));
+      },
     );
   }
 }
 
 Future<void> triggerAutofocus() async {
-  final uri = Uri.parse('http://127.0.0.1:5000/autofocus');
+  final uri = Uri.parse('http://127.0.0.1:5000/autofocus');  // Replace with actual autofocus endpoint
   try {
     final response = await http.post(uri);
     if (response.statusCode == 200) {
