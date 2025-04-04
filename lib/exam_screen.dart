@@ -1,7 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:async';
-import 'package:flutter/material.dart';  
-
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class PiCameraScreen extends StatelessWidget {
   @override
@@ -12,13 +12,42 @@ class PiCameraScreen extends StatelessWidget {
       appBar: AppBar(title: Text("Raspberry Pi Stream")),
       body: Column(
         children: [
-          Expanded(child: MJPEGViewer(streamUrl: streamUrl)),
+          Expanded(
+            child: WebViewStream(url: streamUrl),
+          ),
           ElevatedButton(
             onPressed: triggerAutofocus,
             child: Text("Trigger Autofocus"),
           ),
         ],
       ),
+    );
+  }
+}
+
+class WebViewStream extends StatefulWidget {
+  final String url;
+  const WebViewStream({Key? key, required this.url}) : super(key: key);
+
+  @override
+  State<WebViewStream> createState() => _WebViewStreamState();
+}
+
+class _WebViewStreamState extends State<WebViewStream> {
+  late final WebViewController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WebViewWidget(
+      controller: controller,
     );
   }
 }
@@ -34,77 +63,5 @@ Future<void> triggerAutofocus() async {
     }
   } catch (e) {
     debugPrint("Error: $e");
-  }
-}
-
-
-class MJPEGViewer extends StatefulWidget {
-  final String streamUrl;
-  const MJPEGViewer({Key? key, required this.streamUrl}) : super(key: key);
-
-  @override
-  State<MJPEGViewer> createState() => _MJPEGViewerState();
-}
-
-class _MJPEGViewerState extends State<MJPEGViewer> {
-  late String currentFrameUrl;
-  Timer? timer;
-  bool isConnected = false;
-
-  @override
-  void initState() {
-    super.initState();
-    currentFrameUrl = widget.streamUrl;
-    
-    // Reduced refresh rate to 30fps (approximately)
-    timer = Timer.periodic(Duration(milliseconds: 33), (_) {
-      if (mounted) {
-        setState(() {
-          currentFrameUrl = widget.streamUrl + "?t=${DateTime.now().millisecondsSinceEpoch}";
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Image.network(
-      currentFrameUrl,
-      gaplessPlayback: true,
-      fit: BoxFit.contain,
-      headers: {
-        'Accept': 'multipart/x-mixed-replace; boundary=frame',
-        'Connection': 'keep-alive',
-      },
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) {
-          isConnected = true;
-          return child;
-        }
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Connecting to stream...'),
-            ],
-          ),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        isConnected = false;
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.red),
-              SizedBox(height: 16),
-              Text('Failed to connect to stream\nPlease check if the server is running'),
-            ],
-          ),
-        );
-      },
-    );
   }
 }
