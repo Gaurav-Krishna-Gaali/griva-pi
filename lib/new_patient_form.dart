@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:griva_pi/colposcopy_screen.dart';
 import 'package:intl/intl.dart';
 import 'custom_app_bar.dart';
 import 'custom_drawer.dart';

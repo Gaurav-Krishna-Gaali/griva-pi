@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:typed_data';
 
 class PiCameraScreen extends StatefulWidget {
   const PiCameraScreen({super.key});
@@ -16,6 +18,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isShutterPressed = false;
   bool isGreenFilterActive = false;
   bool showFlash = false;
+  Uint8List? capturedImageBytes; // Change this from String? to Uint8List?
 
   // Animation controller declared but initialized in initState
   late AnimationController _flashAnimationController;
@@ -149,6 +152,49 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   void _openViaOptions() {
     // Simple state change without SnackBar
     // In a real app, you would show a dialog with options
+  }
+
+  // Add new capture method
+  Future<void> _captureImage(BuildContext context) async {
+    const captureUrl = 'http://127.0.0.1:5000/capture';
+
+    setState(() {
+      isShutterPressed = true;
+      showFlash = true;
+    });
+
+    if (mounted) {
+      _flashAnimationController.reset();
+      _flashAnimationController.forward();
+    }
+
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    try {
+      final response = await http.get(Uri.parse(captureUrl));
+      if (response.statusCode == 200 && mounted) {
+        setState(() {
+          // Store the raw bytes directly
+          capturedImageBytes = response.bodyBytes;
+        });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to capture image: ${response.body}")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isShutterPressed = false;
+        });
+      }
+    }
   }
 
   @override
@@ -319,40 +365,58 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         ),
                       ),
                     ),
+                    // Autofocus button
+                    GestureDetector(
+                      onTap: () => _triggerAutofocus(context),
+                      child: Container(
+                        width: 45,
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.center_focus_strong,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
                     // Shutter button with more stable animation
                     GestureDetector(
-                      onTap:
-                          isPhoto
-                              ? () => _triggerAutofocus(context)
-                              : _toggleRecording,
+                      onTap: isPhoto
+                          ? () => _captureImage(context)
+                          : _toggleRecording,
                       child: Container(
                         width: isShutterPressed ? 65 : 70,
                         height: isShutterPressed ? 65 : 70,
                         decoration: BoxDecoration(
-                          color:
-                              isRecording && !isPhoto
-                                  ? Colors.red
-                                  : Colors.white,
+                          color: isRecording && !isPhoto
+                              ? Colors.red
+                              : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: Colors.white,
                             width: isShutterPressed ? 3 : 5,
                           ),
                         ),
-                        child:
-                            isRecording && !isPhoto
-                                ? Center(
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.rectangle,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
+                        child: isRecording && !isPhoto
+                            ? Center(
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.rectangle,
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                )
-                                : null,
+                                ),
+                              )
+                            : Icon(
+                                isPhoto ? Icons.camera : Icons.videocam,
+                                color: Colors.black,
+                                size: 30,
+                              ),
                       ),
                     ),
                     // VIA button
@@ -398,6 +462,35 @@ class _PiCameraScreenState extends State<PiCameraScreen>
               ],
             ),
           ),
+
+          // Add preview of captured image if available
+          if (capturedImageBytes != null)
+            Positioned(
+              top: 100,
+              right: 20,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    capturedImageBytes = null;
+                  });
+                },
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white, width: 2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      capturedImageBytes!,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
