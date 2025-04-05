@@ -3,6 +3,7 @@ import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
+import 'gallery_screen.dart';
 
 class PiCameraScreen extends StatefulWidget {
   const PiCameraScreen({super.key});
@@ -18,7 +19,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isShutterPressed = false;
   bool isGreenFilterActive = false;
   bool showFlash = false;
-  Uint8List? capturedImageBytes; // Change this from String? to Uint8List?
+  Uint8List? capturedImageBytes;
+  
+  // Add list to store captured images
+  final List<Uint8List> capturedImages = [];
 
   // Animation controller declared but initialized in initState
   late AnimationController _flashAnimationController;
@@ -145,8 +149,19 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   }
 
   void _openGallery() {
-    // Simple state change without SnackBar
-    // In a real app, you would navigate to the gallery screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GalleryScreen(
+          images: capturedImages,
+          onDelete: (index) {
+            setState(() {
+              capturedImages.removeAt(index);
+            });
+          },
+        ),
+      ),
+    );
   }
 
   void _openViaOptions() {
@@ -174,8 +189,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       final response = await http.get(Uri.parse(captureUrl));
       if (response.statusCode == 200 && mounted) {
         setState(() {
-          // Store the raw bytes directly
+          // Store the raw bytes directly and add to stack
           capturedImageBytes = response.bodyBytes;
+          capturedImages.add(response.bodyBytes);
         });
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
