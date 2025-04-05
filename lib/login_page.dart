@@ -19,6 +19,14 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
   final String _validEmail = 'doctor@griva.com';
   final String _validPassword = 'GrivaDoc2024!';
 
+  @override
+  void initState() {
+    super.initState();
+    // Prepopulate the email and password fields
+    _emailController.text = _validEmail;
+    _passwordController.text = _validPassword;
+  }
+
   void _login() async {
     setState(() {
       _isLoading = true;
