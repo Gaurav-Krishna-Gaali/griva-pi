@@ -63,142 +63,191 @@ class _PiCameraScreenState extends State<PiCameraScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // Top controls
+          // Camera feed
+          Positioned.fill(child: WebViewStream(url: streamUrl)),
+
+          // Top controls - minimalist row with icons
           Positioned(
             top: 40,
             left: 0,
             right: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Back button
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.white),
-                        onPressed: () {}, // TODO: Implement delete
+                ),
+                // Center controls
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.wb_sunny_outlined,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {}, // TODO: Implement brightness
+                      onPressed: () {}, // Trash
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.wb_sunny_outlined,
+                        color: Colors.white,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.zoom_in, color: Colors.white),
-                        onPressed: () {}, // TODO: Implement zoom
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.info_outline,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {}, // TODO: Implement info
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Camera feed
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 80),
-              child: WebViewStream(url: streamUrl),
+                      onPressed: () {}, // Light/exposure
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.zoom_in, color: Colors.white),
+                      onPressed: () {}, // Zoom
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.info_outline, color: Colors.white),
+                      onPressed: () {}, // Info
+                    ),
+                  ],
+                ),
+                // Spacer for symmetry
+                SizedBox(width: 56),
+              ],
             ),
           ),
 
           // Bottom controls
           Positioned(
-            bottom: 0,
+            bottom: 30,
             left: 0,
             right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Mode selector
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            child: Column(
+              children: [
+                // Mode selector (Photo/Video) - Segmented Control Style
+                Container(
+                  width: 180,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
                     children: [
-                      TextButton(
-                        onPressed: () => setState(() => isPhoto = true),
-                        child: Text(
-                          'Photo',
-                          style: TextStyle(
-                            color: isPhoto ? Colors.white : Colors.grey,
-                            fontWeight:
-                                isPhoto ? FontWeight.bold : FontWeight.normal,
+                      // Photo Button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => isPhoto = true),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color:
+                                  isPhoto ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Photo',
+                              style: TextStyle(
+                                color: isPhoto ? Colors.black : Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => setState(() => isPhoto = false),
-                        child: Text(
-                          'Video',
-                          style: TextStyle(
-                            color: !isPhoto ? Colors.white : Colors.grey,
-                            fontWeight:
-                                !isPhoto ? FontWeight.bold : FontWeight.normal,
+                      // Video Button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => isPhoto = false),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color:
+                                  !isPhoto ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Video',
+                              style: TextStyle(
+                                color: !isPhoto ? Colors.black : Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  // Camera controls
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.photo_library,
+                ),
+                const SizedBox(height: 30),
+                // Camera controls
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Green button
+                    GestureDetector(
+                      onTap: () {}, // TODO: Implement color filter
+                      child: Container(
+                        width: 45,
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    // Shutter button
+                    GestureDetector(
+                      onTap:
+                          isPhoto
+                              ? () => _triggerAutofocus(context)
+                              : _toggleRecording,
+                      child: Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
                           color: Colors.white,
-                          size: 30,
-                        ),
-                        onPressed: () {}, // TODO: Implement gallery
-                      ),
-                      GestureDetector(
-                        onTap:
-                            isPhoto
-                                ? () => _triggerAutofocus(context)
-                                : _toggleRecording,
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 4),
-                            color:
-                                isRecording && !isPhoto
-                                    ? Colors.red
-                                    : Colors.transparent,
-                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 5),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.cameraswitch,
+                    ),
+                    // VIA button
+                    Container(
+                      width: 45,
+                      height: 45,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'VIA',
+                        style: TextStyle(
                           color: Colors.white,
-                          size: 30,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
-                        onPressed: () {}, // TODO: Implement camera switch
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    // Menu/gallery button
+                    Container(
+                      width: 45,
+                      height: 45,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.grid_view,
+                        color: Colors.black,
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
