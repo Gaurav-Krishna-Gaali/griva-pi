@@ -3,6 +3,7 @@ import 'package:griva_pi/colposcopy_screen.dart';
 import 'package:intl/intl.dart';
 import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
+import "exam_screen.dart";
 
 class NewPatientForm extends StatefulWidget {
   const NewPatientForm({Key? key}) : super(key: key);
@@ -1189,7 +1190,12 @@ class _NewPatientFormState extends State<NewPatientForm> {
                   ),
                   ElevatedButton(
                     onPressed: () {
-                      // Add save and start exam logic here
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PiCameraScreen(),
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
