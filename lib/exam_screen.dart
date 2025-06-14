@@ -20,7 +20,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isGreenFilterActive = false;
   bool showFlash = false;
   Uint8List? capturedImageBytes;
-  
+
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
 
@@ -152,14 +152,15 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GalleryScreen(
-          images: capturedImages,
-          onDelete: (index) {
-            setState(() {
-              capturedImages.removeAt(index);
-            });
-          },
-        ),
+        builder:
+            (context) => GalleryScreen(
+              images: capturedImages,
+              onDelete: (index) {
+                setState(() {
+                  capturedImages.removeAt(index);
+                });
+              },
+            ),
       ),
     );
   }
@@ -200,9 +201,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     } finally {
       if (mounted) {
@@ -215,7 +216,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    const streamUrl = 'http://192.168.1.150:5000/?action=stream';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -400,39 +401,42 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     ),
                     // Shutter button with more stable animation
                     GestureDetector(
-                      onTap: isPhoto
-                          ? () => _captureImage(context)
-                          : _toggleRecording,
+                      onTap:
+                          isPhoto
+                              ? () => _captureImage(context)
+                              : _toggleRecording,
                       child: Container(
                         width: isShutterPressed ? 65 : 70,
                         height: isShutterPressed ? 65 : 70,
                         decoration: BoxDecoration(
-                          color: isRecording && !isPhoto
-                              ? Colors.red
-                              : Colors.white,
+                          color:
+                              isRecording && !isPhoto
+                                  ? Colors.red
+                                  : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: Colors.white,
                             width: isShutterPressed ? 3 : 5,
                           ),
                         ),
-                        child: isRecording && !isPhoto
-                            ? Center(
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.rectangle,
-                                    borderRadius: BorderRadius.circular(4),
+                        child:
+                            isRecording && !isPhoto
+                                ? Center(
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.rectangle,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
                                   ),
+                                )
+                                : Icon(
+                                  isPhoto ? Icons.camera : Icons.videocam,
+                                  color: Colors.black,
+                                  size: 30,
                                 ),
-                              )
-                            : Icon(
-                                isPhoto ? Icons.camera : Icons.videocam,
-                                color: Colors.black,
-                                size: 30,
-                              ),
                       ),
                     ),
                     // VIA button
@@ -499,10 +503,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      capturedImageBytes!,
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.memory(capturedImageBytes!, fit: BoxFit.cover),
                   ),
                 ),
               ),
