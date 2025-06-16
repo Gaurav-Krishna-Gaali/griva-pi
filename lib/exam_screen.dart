@@ -3,6 +3,8 @@ import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:audioplayers/audioplayers.dart';
+import 'dart:async';
 import 'gallery_screen.dart';
 
 class PiCameraScreen extends StatefulWidget {
@@ -20,6 +22,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isGreenFilterActive = false;
   bool showFlash = false;
   Uint8List? capturedImageBytes;
+  bool isTimerRunning = false;
+  int remainingSeconds = 60;
+  Timer? _timer;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
@@ -57,12 +63,14 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   @override
   void dispose() {
     _flashAnimationController.dispose();
+    _audioPlayer.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   // Fixed method to prevent UI shaking
   Future<void> _triggerAutofocus(BuildContext context) async {
-    const autofocusUrl = 'http://127.0.0.1:5000/autofocus';
+    const autofocusUrl = 'http://192.168.1.150:5000/autofocus';
 
     // Set state first to show visual feedback
     setState(() {
@@ -83,14 +91,14 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       final response = await http.post(Uri.parse(autofocusUrl));
       if (response.statusCode != 200 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to autofocus: ${response.body}")),
+          SnackBar(content: Text("Failed to autofocus: ${response.statusCode}")),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
       }
     } finally {
       // Ensure we reset the button state
@@ -104,7 +112,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Fixed method to prevent UI shaking
   Future<void> _toggleRecording() async {
-    const recordUrl = 'http://127.0.0.1:5000/record';
+    const recordUrl = 'http://192.168.1.150:5000/record';
 
     setState(() {
       isShutterPressed = true;
@@ -123,12 +131,16 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         setState(() {
           isRecording = !isRecording;
         });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to toggle recording: ${response.statusCode}")),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Recording error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
       }
     } finally {
       if (mounted) {
@@ -172,7 +184,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add new capture method
   Future<void> _captureImage(BuildContext context) async {
-    const captureUrl = 'http://127.0.0.1:5000/capture';
+    const captureUrl = 'http://192.168.1.150:5000/capture';
 
     setState(() {
       isShutterPressed = true;
@@ -190,20 +202,19 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       final response = await http.get(Uri.parse(captureUrl));
       if (response.statusCode == 200 && mounted) {
         setState(() {
-          // Store the raw bytes directly and add to stack
           capturedImageBytes = response.bodyBytes;
           capturedImages.add(response.bodyBytes);
         });
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to capture image: ${response.body}")),
+          SnackBar(content: Text("Failed to capture image: ${response.statusCode}")),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
       }
     } finally {
       if (mounted) {
@@ -214,9 +225,46 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
   }
 
+  void _startTimer() {
+    if (isTimerRunning) return;
+
+    setState(() {
+      isTimerRunning = true;
+      remainingSeconds = 60;
+    });
+
+    // Play start sound
+    _audioPlayer.play(AssetSource('sounds/start.mp3'));
+
+    // Start countdown using Timer.periodic
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (remainingSeconds > 0) {
+        setState(() {
+          remainingSeconds--;
+        });
+      } else {
+        _timer?.cancel();
+        _audioPlayer.play(AssetSource('sounds/stop.mp3'));
+        setState(() {
+          isTimerRunning = false;
+        });
+      }
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _audioPlayer.play(AssetSource('sounds/stop.mp3'));
+    setState(() {
+      isTimerRunning = false;
+      remainingSeconds = 60;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    const streamUrl = 'http://192.168.1.150:5000/?action=stream';
+    // const streamUrl = 'http://192.168.1.150:5000/?action=stream';
+    const streamUrl = 'http://192.168.1.150:5000/video_feed';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -304,59 +352,78 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             child: Column(
               children: [
                 // Mode selector (Photo/Video) - Segmented Control Style
-                Container(
-                  width: 180,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      // Photo Button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => isPhoto = true),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color:
-                                  isPhoto ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Photo',
-                              style: TextStyle(
-                                color: isPhoto ? Colors.black : Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                Column(
+                  children: [
+                    if (isTimerRunning)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$remainingSeconds',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      // Video Button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => isPhoto = false),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color:
-                                  !isPhoto ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Video',
-                              style: TextStyle(
-                                color: !isPhoto ? Colors.black : Colors.white,
-                                fontWeight: FontWeight.w600,
+                    Container(
+                      width: 180,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          // Photo Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isPhoto = true),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isPhoto ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Photo',
+                                  style: TextStyle(
+                                    color: isPhoto ? Colors.black : Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                          // Video Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isPhoto = false),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: !isPhoto ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Video',
+                                  style: TextStyle(
+                                    color: !isPhoto ? Colors.black : Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 30),
                 // Camera controls
@@ -370,15 +437,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color:
-                              isGreenFilterActive
-                                  ? Colors.green.shade300
-                                  : Colors.green,
+                          color: isGreenFilterActive ? Colors.green.shade300 : Colors.green,
                           shape: BoxShape.circle,
-                          border:
-                              isGreenFilterActive
-                                  ? Border.all(color: Colors.white, width: 2)
-                                  : null,
+                          border: isGreenFilterActive ? Border.all(color: Colors.white, width: 2) : null,
                         ),
                       ),
                     ),
@@ -388,7 +449,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                       child: Container(
                         width: 45,
                         height: 45,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: Colors.blue,
                           shape: BoxShape.circle,
                         ),
@@ -401,58 +462,51 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     ),
                     // Shutter button with more stable animation
                     GestureDetector(
-                      onTap:
-                          isPhoto
-                              ? () => _captureImage(context)
-                              : _toggleRecording,
+                      onTap: isPhoto ? () => _captureImage(context) : _toggleRecording,
                       child: Container(
                         width: isShutterPressed ? 65 : 70,
                         height: isShutterPressed ? 65 : 70,
                         decoration: BoxDecoration(
-                          color:
-                              isRecording && !isPhoto
-                                  ? Colors.red
-                                  : Colors.white,
+                          color: isRecording && !isPhoto ? Colors.red : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: Colors.white,
                             width: isShutterPressed ? 3 : 5,
                           ),
                         ),
-                        child:
-                            isRecording && !isPhoto
-                                ? Center(
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.rectangle,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
+                        child: isRecording && !isPhoto
+                            ? Center(
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.rectangle,
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                )
-                                : Icon(
-                                  isPhoto ? Icons.camera : Icons.videocam,
-                                  color: Colors.black,
-                                  size: 30,
                                 ),
+                              )
+                            : Icon(
+                                isPhoto ? Icons.camera : Icons.videocam,
+                                color: Colors.black,
+                                size: 30,
+                              ),
                       ),
                     ),
                     // VIA button
                     GestureDetector(
-                      onTap: _openViaOptions,
+                      onTap: isTimerRunning ? _stopTimer : _startTimer,
                       child: Container(
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.5),
+                          color: isTimerRunning ? Colors.red : Colors.grey.withOpacity(0.5),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
-                        child: const Text(
-                          'VIA',
-                          style: TextStyle(
+                        child: Text(
+                          isTimerRunning ? 'VIA' : 'VIA',
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,

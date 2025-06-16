@@ -3,6 +3,7 @@ import 'package:griva_pi/custom_app_bar.dart';
 import 'new_patient_form.dart';
 import 'custom_drawer.dart';
 import 'exam_screen.dart';
+import 'screens/patient_list_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -103,12 +104,20 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SizedBox(width: 16),
                 Expanded(
-                  child: _buildActionCard(
-                    icon: Icons.folder_outlined,
-                    title: 'Patient Database',
-                    subtitle: ' ',
-                    color: Color(0xFFF5E6FF),
-                    iconColor: Colors.black87,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const PatientListScreen()),
+                      );
+                    },
+                    child: _buildActionCard(
+                      icon: Icons.folder_outlined,
+                      title: 'Patient Database',
+                      subtitle: 'View all patients',
+                      color: Color(0xFFF5E6FF),
+                      iconColor: Colors.black87,
+                    ),
                   ),
                 ),
               ],
