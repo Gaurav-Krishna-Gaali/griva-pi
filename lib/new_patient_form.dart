@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
 import "exam_screen.dart";
+import 'services/patient_service.dart';
 
 class NewPatientForm extends StatefulWidget {
   const NewPatientForm({Key? key}) : super(key: key);
@@ -16,6 +17,19 @@ class _NewPatientFormState extends State<NewPatientForm> {
   final TextEditingController _dateOfVisitController = TextEditingController();
   final TextEditingController _lastMenstrualDateController =
       TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _patientIdController = TextEditingController();
+  final TextEditingController _mobileController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _doctorNameController = TextEditingController();
+  final TextEditingController _referredByController = TextEditingController();
+  final TextEditingController _medicationController = TextEditingController();
+  final TextEditingController _allergiesController = TextEditingController();
+  final TextEditingController _referralReasonController = TextEditingController();
+  final TextEditingController _symptomsController = TextEditingController();
+  final TextEditingController _patientSummaryController = TextEditingController();
+  final TextEditingController _hcgLevelController = TextEditingController();
 
   // Add state variables for smoking and blood group
   String? _smokingValue;
@@ -41,11 +55,27 @@ class _NewPatientFormState extends State<NewPatientForm> {
   String? _hcgTestValue;
   TextEditingController _hcgDateController = TextEditingController();
 
+  final _patientService = PatientService();
+  bool _isSaving = false;
+
   @override
   void dispose() {
     _dateOfBirthController.dispose();
     _dateOfVisitController.dispose();
     _lastMenstrualDateController.dispose();
+    _nameController.dispose();
+    _patientIdController.dispose();
+    _mobileController.dispose();
+    _emailController.dispose();
+    _addressController.dispose();
+    _doctorNameController.dispose();
+    _referredByController.dispose();
+    _medicationController.dispose();
+    _allergiesController.dispose();
+    _referralReasonController.dispose();
+    _symptomsController.dispose();
+    _patientSummaryController.dispose();
+    _hcgLevelController.dispose();
     _hpvDateController.dispose();
     _hcgDateController.dispose();
     super.dispose();
@@ -66,6 +96,70 @@ class _NewPatientFormState extends State<NewPatientForm> {
       setState(() {
         controller.text = DateFormat('MM/dd/yyyy').format(picked);
       });
+    }
+  }
+
+  Future<void> _savePatient({required bool goToExam}) async {
+    setState(() { _isSaving = true; });
+    try {
+      final patient = Patient(
+        patientName: _nameController.text,
+        patientId: _patientIdController.text,
+        dateOfBirth: _dateOfBirthController.text.isNotEmpty ? DateFormat('MM/dd/yyyy').parse(_dateOfBirthController.text) : null,
+        dateOfVisit: _dateOfVisitController.text.isNotEmpty ? DateFormat('MM/dd/yyyy').parse(_dateOfVisitController.text) : null,
+        mobileNo: _mobileController.text,
+        email: _emailController.text,
+        address: _addressController.text,
+        doctorName: _doctorNameController.text,
+        referredBy: _referredByController.text,
+        smoking: _smokingValue,
+        bloodGroup: _selectedBloodGroup == 'Dropdown' ? null : _selectedBloodGroup,
+        medication: _medicationController.text,
+        allergies: _allergiesController.text,
+        menopause: _menopauseValue,
+        lastMenstrualDate: _lastMenstrualDateController.text.isNotEmpty ? DateFormat('MM/dd/yyyy').parse(_lastMenstrualDateController.text) : null,
+        sexuallyActive: _sexuallyActiveValue,
+        contraception: _selectedContraception == 'Dropdown' ? null : _selectedContraception,
+        hivStatus: _selectedHIVStatus == 'Dropdown' ? null : _selectedHIVStatus,
+        pregnant: _pregnantValue,
+        liveBirths: _liveBirths,
+        stillBirths: _stillBirths,
+        abortions: _abortions,
+        cesareans: _cesareans,
+        miscarriages: _miscarriages,
+        hpvVaccination: _selectedHPVVaccination == 'Dropdown' ? null : _selectedHPVVaccination,
+        referralReason: _referralReasonController.text,
+        symptoms: _symptomsController.text,
+        hpvTest: _hpvTestValue,
+        hpvResult: _hpvResultValue,
+        hpvDate: _hpvDateController.text.isNotEmpty ? DateFormat('MM/dd/yyyy').parse(_hpvDateController.text) : null,
+        hcgTest: _hcgTestValue,
+        hcgDate: _hcgDateController.text.isNotEmpty ? DateFormat('MM/dd/yyyy').parse(_hcgDateController.text) : null,
+        hcgLevel: _hcgLevelController.text.isNotEmpty ? double.tryParse(_hcgLevelController.text) : null,
+        patientSummary: _patientSummaryController.text,
+      );
+      await _patientService.createPatient(patient);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Patient saved successfully!')),
+        );
+        if (goToExam) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const PiCameraScreen()),
+          );
+        } else {
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving patient: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { _isSaving = false; });
     }
   }
 
@@ -206,6 +300,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
+                                controller: _nameController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(4),
@@ -233,6 +328,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
+                                controller: _patientIdController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(4),
@@ -344,6 +440,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
+                                controller: _mobileController,
                                 keyboardType: TextInputType.phone,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
@@ -372,6 +469,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
+                                controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
@@ -403,6 +501,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
+                          controller: _addressController,
                           maxLines: 3,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
@@ -435,6 +534,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
+                                controller: _doctorNameController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(4),
@@ -462,6 +562,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
+                                controller: _referredByController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(4),
@@ -584,6 +685,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                             children: [
                               const Text('Medication'),
                               TextFormField(
+                                controller: _medicationController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(),
                                   contentPadding: const EdgeInsets.all(8.0),
@@ -597,6 +699,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     const SizedBox(height: 16),
                     const Text('Any Allergies'),
                     TextFormField(
+                      controller: _allergiesController,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(),
                         contentPadding: const EdgeInsets.all(8.0),
@@ -1012,6 +1115,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                             children: [
                               const Text('Referral reason'),
                               TextFormField(
+                                controller: _referralReasonController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(),
                                   contentPadding: const EdgeInsets.all(8.0),
@@ -1026,6 +1130,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                             children: [
                               const Text('Symptoms'),
                               TextFormField(
+                                controller: _symptomsController,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(),
                                   contentPadding: const EdgeInsets.all(8.0),
@@ -1146,6 +1251,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     const SizedBox(height: 8),
                     const Text('HCG Level (in mIU/ml)'),
                     TextFormField(
+                      controller: _hcgLevelController,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(),
                         contentPadding: const EdgeInsets.all(8.0),
@@ -1156,6 +1262,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     // Patient Summary & Notes
                     const Text('Patient Summary & Notes'),
                     TextFormField(
+                      controller: _patientSummaryController,
                       maxLines: 3,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(),
@@ -1171,9 +1278,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   ElevatedButton(
-                    onPressed: () {
-                      // Add save and edit logic here
-                    },
+                    onPressed: _isSaving ? null : () => _savePatient(goToExam: false),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       foregroundColor: Colors.white,
@@ -1188,14 +1293,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                     child: const Text('Save and Edit'),
                   ),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PiCameraScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: _isSaving ? null : () => _savePatient(goToExam: true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       foregroundColor: Colors.white,
