@@ -5,6 +5,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'screens/patient_list_screen.dart';
 import 'login_page.dart';
 
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 void main() {
   // Initialize FFI
   sqfliteFfiInit();
@@ -26,6 +28,7 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           home: GrivaLoginPage(),
+          navigatorObservers: [routeObserver],
         );
       },
     );

@@ -87,7 +87,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
     if (confirmed == true) {
       try {
         await _patientService.deletePatient(patient.id!);
-        _loadPatients();
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context, true);
+        } else {
+          _loadPatients();
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

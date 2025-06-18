@@ -4,6 +4,9 @@ import 'new_patient_form.dart';
 import 'custom_drawer.dart';
 import 'exam_screen.dart';
 import 'screens/patient_list_screen.dart';
+import 'services/patient_service.dart';
+import 'screens/patient_form_screen.dart';
+import 'main.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -12,9 +15,46 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with RouteAware {
   // Add state variable for active tab
   bool _showUpcoming = true;
+  List<Patient> _patients = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPatients();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when coming back to this page
+    _fetchPatients();
+  }
+
+  Future<void> _fetchPatients() async {
+    final patients = await PatientService().getAllPatients();
+    setState(() {
+      _patients = patients;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +173,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       GestureDetector(
                         onTap: () => setState(() => _showUpcoming = true),
-                        child: _buildTab("Upcoming Appointments", _showUpcoming, '8'),
+                        child: _buildTab("Upcoming Appointments", _showUpcoming, _patients.length.toString()),
                       ),
                       SizedBox(width: 24),
                       GestureDetector(
@@ -157,26 +197,21 @@ class _HomePageState extends State<HomePage> {
                           height: 180,
                           child: Stack(
                             children: [
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    if (_showUpcoming) ...[
-                                      _buildPatientCard(cardWidth),
-                                      SizedBox(width: 16),
-                                      _buildPatientCard(cardWidth),
-                                      SizedBox(width: 16),
-                                      _buildPatientCard(cardWidth),
-                                      SizedBox(width: 16),
-                                      _buildPatientCard(cardWidth),
-                                    ] else ...[
-                                      _buildPatientCard(cardWidth, isPending: true),
-                                      SizedBox(width: 16),
-                                      _buildPatientCard(cardWidth, isPending: true),
-                                    ],
-                                  ],
-                                ),
-                              ),
+                              _isLoading
+                                ? Center(child: CircularProgressIndicator())
+                                : _patients.isEmpty
+                                    ? Center(child: Text('No upcoming appointments'))
+                                    : SizedBox(
+                                        height: 180,
+                                        child: ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: _patients.length,
+                                          separatorBuilder: (_, __) => SizedBox(width: 16),
+                                          itemBuilder: (context, index) {
+                                            return _buildPatientCard(_patients[index], cardWidth);
+                                          },
+                                        ),
+                                      ),
                               Positioned(
                                 right: 0,
                                 top: 0,
@@ -299,7 +334,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildPatientCard(double width, {bool isPending = false}) {
+  Widget _buildPatientCard(Patient patient, double width, {bool isPending = false}) {
     return Container(
       width: width,
       padding: EdgeInsets.all(16),
@@ -313,24 +348,26 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '[Patient\'s Name]',
+            patient.patientName,
             style: TextStyle(
-              fontSize: width * 0.06, // Responsive font size
+              fontSize: width * 0.06,
               fontWeight: FontWeight.w600,
             ),
           ),
           SizedBox(height: 8),
           Text(
-            'Patient ID',
+            patient.patientId ?? '',
             style: TextStyle(
-              fontSize: width * 0.05, // Responsive font size
+              fontSize: width * 0.05,
               color: Colors.grey[600],
             ),
           ),
           Text(
-            'Age',
+            patient.dateOfBirth != null
+              ? 'Age: ${DateTime.now().year - patient.dateOfBirth!.year}'
+              : '',
             style: TextStyle(
-              fontSize: width * 0.05, // Responsive font size
+              fontSize: width * 0.05,
               color: Colors.grey[600],
             ),
           ),
@@ -339,7 +376,17 @@ class _HomePageState extends State<HomePage> {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PatientFormScreen(patient: patient),
+                      ),
+                    );
+                    if (updated == true) {
+                      _fetchPatients();
+                    }
+                  },
                   child: Text('Details'),
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.grey[200],
@@ -355,7 +402,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {},
-                  child: Text(isPending ? 'Review' : 'Start Exam'),
+                  child: Text('Start Exam'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF8B44F7),
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
