@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
-class GalleryScreen extends StatelessWidget {
+class GalleryScreen extends StatefulWidget {
   final List<Uint8List> images;
   final Function(int) onDelete;
 
@@ -12,6 +12,36 @@ class GalleryScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<GalleryScreen> createState() => _GalleryScreenState();
+}
+
+class _GalleryScreenState extends State<GalleryScreen> {
+  late List<Uint8List> _images;
+
+  @override
+  void initState() {
+    super.initState();
+    _images = List.from(widget.images);
+  }
+
+  @override
+  void didUpdateWidget(GalleryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.images != widget.images) {
+      setState(() {
+        _images = List.from(widget.images);
+      });
+    }
+  }
+
+  void _deleteImage(int index) {
+    setState(() {
+      _images.removeAt(index);
+    });
+    widget.onDelete(index);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -20,7 +50,7 @@ class GalleryScreen extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       backgroundColor: Colors.black,
-      body: images.isEmpty
+      body: _images.isEmpty
           ? const Center(
               child: Text(
                 'No images captured yet',
@@ -34,7 +64,7 @@ class GalleryScreen extends StatelessWidget {
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
-              itemCount: images.length,
+              itemCount: _images.length,
               itemBuilder: (context, index) {
                 return GestureDetector(
                   onTap: () {
@@ -42,9 +72,9 @@ class GalleryScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => ImageDetailScreen(
-                          imageBytes: images[index],
+                          imageBytes: _images[index],
                           onDelete: () {
-                            onDelete(index);
+                            _deleteImage(index);
                             Navigator.pop(context);
                           },
                         ),
@@ -59,7 +89,7 @@ class GalleryScreen extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.memory(
-                        images[index],
+                        _images[index],
                         fit: BoxFit.cover,
                       ),
                     ),
