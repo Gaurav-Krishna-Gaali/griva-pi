@@ -3,6 +3,8 @@ import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'gallery_screen.dart';
 
 class PiCameraScreen extends StatefulWidget {
@@ -23,6 +25,14 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
+
+  // Timer variables
+  Timer? _viaTimer;
+  int _viaTimerSeconds = 60;
+  bool _isViaTimerRunning = false;
+
+  // Audio player for timer sounds
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Animation controller declared but initialized in initState
   late AnimationController _flashAnimationController;
@@ -57,6 +67,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   @override
   void dispose() {
     _flashAnimationController.dispose();
+    _viaTimer?.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -214,9 +226,77 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
   }
 
+  // Test audio playback
+  void _testAudio() async {
+    try {
+      print('Testing audio playback...');
+      await _audioPlayer.play(AssetSource('audio/timer_start.mp3'));
+      print('Test audio played successfully');
+    } catch (e) {
+      print('Test audio failed: $e');
+    }
+  }
+
+  // Start or stop VIA timer
+  void _toggleViaTimer() async {
+    if (_isViaTimerRunning) {
+      // Stop timer
+      _viaTimer?.cancel();
+      setState(() {
+        _isViaTimerRunning = false;
+        _viaTimerSeconds = 60;
+      });
+      
+      // Play stop sound
+      try {
+        print('Playing stop sound...');
+        await _audioPlayer.play(AssetSource('audio/timer_stop.mp3'));
+        print('Stop sound played successfully');
+      } catch (e) {
+        print('Error playing stop sound: $e');
+      }
+    } else {
+      // Start timer
+      setState(() {
+        _isViaTimerRunning = true;
+        _viaTimerSeconds = 60;
+      });
+      
+      // Play start sound
+      try {
+        print('Playing start sound...');
+        await _audioPlayer.play(AssetSource('audio/timer_start.mp3'));
+        print('Start sound played successfully');
+      } catch (e) {
+        print('Error playing start sound: $e');
+      }
+      
+      _viaTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) {
+          setState(() {
+            if (_viaTimerSeconds > 0) {
+              _viaTimerSeconds--;
+            } else {
+              _isViaTimerRunning = false;
+              timer.cancel();
+              
+              // Play completion sound
+              _audioPlayer.play(AssetSource('audio/timer_complete.mp3')).then((_) {
+                print('Completion sound played successfully');
+              }).catchError((e) {
+                print('Error playing completion sound: $e');
+              });
+            }
+          });
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const streamUrl = 'http://192.168.1.150:5000/?action=stream';
+    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -288,6 +368,11 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                       icon: const Icon(Icons.info_outline, color: Colors.white),
                       onPressed: () {},
                     ),
+                    // Test audio button
+                    IconButton(
+                      icon: const Icon(Icons.volume_up, color: Colors.white),
+                      onPressed: _testAudio,
+                    ),
                   ],
                 ),
                 // Spacer for symmetry
@@ -304,59 +389,83 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             child: Column(
               children: [
                 // Mode selector (Photo/Video) - Segmented Control Style
-                Container(
-                  width: 180,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      // Photo Button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => isPhoto = true),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color:
-                                  isPhoto ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Photo',
-                              style: TextStyle(
-                                color: isPhoto ? Colors.black : Colors.white,
-                                fontWeight: FontWeight.w600,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 180,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          // Photo Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isPhoto = true),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      isPhoto ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Photo',
+                                  style: TextStyle(
+                                    color: isPhoto ? Colors.black : Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      // Video Button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => isPhoto = false),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color:
-                                  !isPhoto ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Video',
-                              style: TextStyle(
-                                color: !isPhoto ? Colors.black : Colors.white,
-                                fontWeight: FontWeight.w600,
+                          // Video Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isPhoto = false),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      !isPhoto ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Video',
+                                  style: TextStyle(
+                                    color: !isPhoto ? Colors.black : Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Timer display inline with toggle
+                    if (_isViaTimerRunning) ...[
+                      const SizedBox(width: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          '$_viaTimerSeconds',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 30),
                 // Camera controls
@@ -441,16 +550,21 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     ),
                     // VIA button
                     GestureDetector(
-                      onTap: _openViaOptions,
+                      onTap: _toggleViaTimer,
                       child: Container(
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.5),
+                          color: _isViaTimerRunning 
+                              ? Colors.red.withOpacity(0.8)
+                              : Colors.grey.withOpacity(0.5),
                           shape: BoxShape.circle,
+                          border: _isViaTimerRunning 
+                              ? Border.all(color: Colors.white, width: 2)
+                              : null,
                         ),
                         alignment: Alignment.center,
-                        child: const Text(
+                        child: Text(
                           'VIA',
                           style: TextStyle(
                             color: Colors.white,

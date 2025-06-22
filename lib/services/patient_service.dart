@@ -184,61 +184,87 @@ class PatientService {
   static Database? _database;
   static const String tableName = 'patients';
 
+  Future<void> checkDatabaseState() async {
+    try {
+      final db = await database;
+      final tables = await db.query('sqlite_master', where: 'type = ?', whereArgs: ['table']);
+      print('Available tables: ${tables.map((t) => t['name']).toList()}');
+      
+      final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName'));
+      print('Number of patients in database: $count');
+    } catch (e) {
+      print('Error checking database state: $e');
+    }
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
+    await checkDatabaseState();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'patient_database.db');
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: (Database db, int version) async {
-        await db.execute('''
-          CREATE TABLE $tableName(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_name TEXT NOT NULL,
-            patient_id TEXT,
-            date_of_birth TEXT,
-            date_of_visit TEXT,
-            mobile_no TEXT NOT NULL,
-            email TEXT,
-            address TEXT,
-            doctor_name TEXT,
-            referred_by TEXT,
-            smoking TEXT,
-            blood_group TEXT,
-            medication TEXT,
-            allergies TEXT,
-            menopause TEXT,
-            last_menstrual_date TEXT,
-            sexually_active TEXT,
-            contraception TEXT,
-            hiv_status TEXT,
-            pregnant TEXT,
-            live_births INTEGER,
-            still_births INTEGER,
-            abortions INTEGER,
-            cesareans INTEGER,
-            miscarriages INTEGER,
-            hpv_vaccination TEXT,
-            referral_reason TEXT,
-            symptoms TEXT,
-            hpv_test TEXT,
-            hpv_result TEXT,
-            hpv_date TEXT,
-            hcg_test TEXT,
-            hcg_date TEXT,
-            hcg_level REAL,
-            patient_summary TEXT,
-            created_at TEXT,
-            updated_at TEXT
-          )
-        ''');
-      },
-    );
+    try {
+      String path = join(await getDatabasesPath(), 'patient_database.db');
+      print('Initializing database at path: $path'); // Debug log
+      
+      return await openDatabase(
+        path,
+        version: 1,
+        onCreate: (Database db, int version) async {
+          print('Creating new database...'); // Debug log
+          await db.execute('''
+            CREATE TABLE $tableName(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              patient_name TEXT NOT NULL,
+              patient_id TEXT,
+              date_of_birth TEXT,
+              date_of_visit TEXT,
+              mobile_no TEXT NOT NULL,
+              email TEXT,
+              address TEXT,
+              doctor_name TEXT,
+              referred_by TEXT,
+              smoking TEXT,
+              blood_group TEXT,
+              medication TEXT,
+              allergies TEXT,
+              menopause TEXT,
+              last_menstrual_date TEXT,
+              sexually_active TEXT,
+              contraception TEXT,
+              hiv_status TEXT,
+              pregnant TEXT,
+              live_births INTEGER,
+              still_births INTEGER,
+              abortions INTEGER,
+              cesareans INTEGER,
+              miscarriages INTEGER,
+              hpv_vaccination TEXT,
+              referral_reason TEXT,
+              symptoms TEXT,
+              hpv_test TEXT,
+              hpv_result TEXT,
+              hpv_date TEXT,
+              hcg_test TEXT,
+              hcg_date TEXT,
+              hcg_level REAL,
+              patient_summary TEXT,
+              created_at TEXT,
+              updated_at TEXT
+            )
+          ''');
+          print('Database table created successfully'); // Debug log
+        },
+        onOpen: (db) {
+          print('Database opened successfully'); // Debug log
+        },
+      );
+    } catch (e) {
+      print('Error initializing database: $e'); // Error log
+      rethrow;
+    }
   }
 
   Future<List<Patient>> getAllPatients() async {
