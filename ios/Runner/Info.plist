@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to save PDF files.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents folder to save PDF files.</string>
 </dict>
 </plist>
