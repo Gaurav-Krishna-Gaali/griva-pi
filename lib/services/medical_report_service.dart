@@ -5,356 +5,116 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'patient_service.dart';
 
 class MedicalReportService {
   static Future<String?> generateComprehensiveReport({
     required Patient patient,
     required List<Uint8List> images,
-    String? additionalNotes,
-    String? diagnosis,
-    String? treatmentPlan,
-    String? followUpDate,
+    String? chiefComplaint,
+    String? cytologyReport,
+    String? pathologicalReport,
+    String? colposcopyFindings,
+    String? finalImpression,
+    String? remarks,
+    String? treatmentProvided,
+    String? precautions,
+    String? examiningPhysician,
+    String? signatureDate,
+    Map<String, String>? forensicExamination,
   }) async {
     try {
-      // Create PDF document
       final pdf = pw.Document();
 
-      // Add title page
+      // --- NEW ROBUST FONT LOADING ---
+      pw.ThemeData theme;
+      try {
+        final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+        final boldFontData = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+
+        // Explicitly check if font files have content before trying to parse them.
+        // A valid TTF file is usually several kilobytes. A small number indicates an empty or invalid file.
+        if (fontData.lengthInBytes < 100 || boldFontData.lengthInBytes < 100) {
+            print('WARNING: Font files in assets/fonts/ are empty or invalid. Falling back to default fonts.');
+            throw Exception('Invalid font file'); // Force fallback to catch block
+        }
+
+        final ttf = pw.Font.ttf(fontData);
+        final boldTtf = pw.Font.ttf(boldFontData);
+
+        theme = pw.ThemeData.withFont(
+          base: ttf,
+          bold: boldTtf,
+        );
+        print('Custom Roboto fonts loaded successfully.');
+
+      } catch (e) {
+        print('Could not load custom fonts, using default PDF fonts. Error: $e');
+        // Fallback to a default theme if custom fonts fail to load
+        theme = pw.ThemeData.withFont(
+          base: pw.Font.helvetica(),
+          bold: pw.Font.helveticaBold(),
+          italic: pw.Font.helveticaOblique(),
+          boldItalic: pw.Font.helveticaBoldOblique(),
+        );
+      }
+      // --- END OF FONT LOADING ---
+
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
+          theme: theme,
           pageFormat: PdfPageFormat.a4,
+          header: (context) => _buildHeader(),
+          footer: (context) => _buildFooter(patient, examiningPhysician),
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(20),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.blue900,
-                  ),
-                  child: pw.Column(
-                    children: [
-                      pw.Text(
-                        'COMPREHENSIVE MEDICAL REPORT',
-                        style: pw.TextStyle(
-                          fontSize: 24,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.white,
-                        ),
-                        textAlign: pw.TextAlign.center,
-                      ),
-                      pw.SizedBox(height: 10),
-                      pw.Text(
-                        'Colposcopy Examination',
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          color: PdfColors.white,
-                        ),
-                        textAlign: pw.TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
+            return [
+              // Patient Information
+              _buildPatientInfoSection(patient),
+              pw.SizedBox(height: 20),
 
-                // Patient Information Section
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(15),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'PATIENT INFORMATION',
-                        style: pw.TextStyle(
-                          fontSize: 18,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.blue900,
-                        ),
-                      ),
-                      pw.SizedBox(height: 15),
-                      _buildInfoRow('Patient Name:', patient.patientName),
-                      if (patient.patientId != null) _buildInfoRow('Patient ID:', patient.patientId!),
-                      if (patient.dateOfBirth != null) _buildInfoRow('Date of Birth:', _formatDate(patient.dateOfBirth!)),
-                      _buildInfoRow('Mobile Number:', patient.mobileNo),
-                      if (patient.email != null) _buildInfoRow('Email:', patient.email!),
-                      if (patient.address != null) _buildInfoRow('Address:', patient.address!),
-                      if (patient.dateOfVisit != null) _buildInfoRow('Date of Visit:', _formatDate(patient.dateOfVisit!)),
-                      if (patient.doctorName != null) _buildInfoRow('Doctor:', patient.doctorName!),
-                      if (patient.referredBy != null) _buildInfoRow('Referred By:', patient.referredBy!),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
+              // Clinical Findings
+              pw.Text('CLINICAL FINDINGS & EXAMINATION', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              _buildClinicalFindings(
+                chiefComplaint: chiefComplaint,
+                cytologyReport: cytologyReport,
+                pathologicalReport: pathologicalReport,
+                colposcopyFindings: colposcopyFindings,
+                finalImpression: finalImpression,
+                remarks: remarks,
+              ),
+              pw.SizedBox(height: 20),
 
-                // Medical History Section
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(15),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'MEDICAL HISTORY',
-                        style: pw.TextStyle(
-                          fontSize: 18,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.blue900,
-                        ),
-                      ),
-                      pw.SizedBox(height: 15),
-                      if (patient.bloodGroup != null) _buildInfoRow('Blood Group:', patient.bloodGroup!),
-                      if (patient.smoking != null) _buildInfoRow('Smoking Status:', patient.smoking!),
-                      if (patient.allergies != null) _buildInfoRow('Allergies:', patient.allergies!),
-                      if (patient.medication != null) _buildInfoRow('Current Medication:', patient.medication!),
-                      if (patient.menopause != null) _buildInfoRow('Menopause Status:', patient.menopause!),
-                      if (patient.lastMenstrualDate != null) _buildInfoRow('Last Menstrual Date:', _formatDate(patient.lastMenstrualDate!)),
-                      if (patient.sexuallyActive != null) _buildInfoRow('Sexually Active:', patient.sexuallyActive!),
-                      if (patient.contraception != null) _buildInfoRow('Contraception:', patient.contraception!),
-                      if (patient.hivStatus != null) _buildInfoRow('HIV Status:', patient.hivStatus!),
-                      if (patient.pregnant != null) _buildInfoRow('Pregnancy Status:', patient.pregnant!),
-                      if (patient.hpvVaccination != null) _buildInfoRow('HPV Vaccination:', patient.hpvVaccination!),
-                    ],
-                  ),
-                ),
+              // Forensic Examination
+              if (forensicExamination != null && forensicExamination.isNotEmpty) ...[
+                pw.Text('FORENSIC EXAMINATION', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+                _buildForensicExamination(forensicExamination),
                 pw.SizedBox(height: 20),
-
-                // Obstetric History
-                if (_hasObstetricHistory(patient))
-                  pw.Container(
-                    width: double.infinity,
-                    padding: const pw.EdgeInsets.all(15),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: PdfColors.grey300),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                    ),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'OBSTETRIC HISTORY',
-                          style: pw.TextStyle(
-                            fontSize: 18,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.blue900,
-                          ),
-                        ),
-                        pw.SizedBox(height: 15),
-                        if (patient.liveBirths != null) _buildInfoRow('Live Births:', patient.liveBirths.toString()),
-                        if (patient.stillBirths != null) _buildInfoRow('Still Births:', patient.stillBirths.toString()),
-                        if (patient.abortions != null) _buildInfoRow('Abortions:', patient.abortions.toString()),
-                        if (patient.cesareans != null) _buildInfoRow('Cesareans:', patient.cesareans.toString()),
-                        if (patient.miscarriages != null) _buildInfoRow('Miscarriages:', patient.miscarriages.toString()),
-                      ],
-                    ),
-                  ),
-                pw.SizedBox(height: 20),
-
-                // Test Results Section
-                if (_hasTestResults(patient))
-                  pw.Container(
-                    width: double.infinity,
-                    padding: const pw.EdgeInsets.all(15),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: PdfColors.grey300),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                    ),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'TEST RESULTS',
-                          style: pw.TextStyle(
-                            fontSize: 18,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.blue900,
-                          ),
-                        ),
-                        pw.SizedBox(height: 15),
-                        if (patient.hpvTest != null) _buildInfoRow('HPV Test:', patient.hpvTest!),
-                        if (patient.hpvResult != null) _buildInfoRow('HPV Result:', patient.hpvResult!),
-                        if (patient.hpvDate != null) _buildInfoRow('HPV Test Date:', _formatDate(patient.hpvDate!)),
-                        if (patient.hcgTest != null) _buildInfoRow('HCG Test:', patient.hcgTest!),
-                        if (patient.hcgDate != null) _buildInfoRow('HCG Test Date:', _formatDate(patient.hcgDate!)),
-                        if (patient.hcgLevel != null) _buildInfoRow('HCG Level:', patient.hcgLevel.toString()),
-                      ],
-                    ),
-                  ),
-                pw.SizedBox(height: 20),
-
-                // Report Generation Info
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.grey100,
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                  ),
-                  child: pw.Text(
-                    'Report generated on: ${_formatDate(DateTime.now())}',
-                    style: pw.TextStyle(
-                      fontSize: 12,
-                      color: PdfColors.grey600,
-                    ),
-                  ),
-                ),
               ],
-            );
+              
+              // Treatment & Follow-up
+              if (treatmentProvided != null && treatmentProvided.isNotEmpty)
+                _buildColoredCard('Treatment Provided', treatmentProvided, PdfColors.blue100),
+              if (precautions != null && precautions.isNotEmpty)
+                _buildColoredCard('Precautions & Follow-up', precautions, PdfColors.amber100),
+              
+              pw.SizedBox(height: 20),
+
+              // Colposcopy Images
+              if (images.isNotEmpty) ...[
+                pw.Text('COLPOSCOPY IMAGES', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+                _buildImageGrid(images),
+              ],
+            ];
           },
         ),
       );
-
-      // Add clinical findings page
-      if (diagnosis != null || treatmentPlan != null || additionalNotes != null) {
-        pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            build: (pw.Context context) {
-              return pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    'CLINICAL FINDINGS & RECOMMENDATIONS',
-                    style: pw.TextStyle(
-                      fontSize: 20,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.blue900,
-                    ),
-                  ),
-                  pw.SizedBox(height: 20),
-
-                  if (patient.referralReason != null) ...[
-                    pw.Text(
-                      'Referral Reason:',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(patient.referralReason!),
-                    pw.SizedBox(height: 15),
-                  ],
-
-                  if (patient.symptoms != null) ...[
-                    pw.Text(
-                      'Symptoms:',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(patient.symptoms!),
-                    pw.SizedBox(height: 15),
-                  ],
-
-                  if (diagnosis != null) ...[
-                    pw.Text(
-                      'Diagnosis:',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(diagnosis),
-                    pw.SizedBox(height: 15),
-                  ],
-
-                  if (treatmentPlan != null) ...[
-                    pw.Text(
-                      'Treatment Plan:',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(treatmentPlan),
-                    pw.SizedBox(height: 15),
-                  ],
-
-                  if (followUpDate != null) ...[
-                    pw.Text(
-                      'Follow-up Date:',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(followUpDate),
-                    pw.SizedBox(height: 15),
-                  ],
-
-                  if (additionalNotes != null) ...[
-                    pw.Text(
-                      'Additional Notes:',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(additionalNotes),
-                  ],
-                ],
-              );
-            },
-          ),
-        );
-      }
-
-      // Add image pages
-      for (int i = 0; i < images.length; i++) {
-        final imageBytes = images[i];
-        final image = pw.MemoryImage(imageBytes);
-        
-        pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            build: (pw.Context context) {
-              return pw.Column(
-                children: [
-                  pw.Text(
-                    'COLPOSCOPY IMAGE ${i + 1}',
-                    style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.blue900,
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Expanded(
-                    child: pw.Center(
-                      child: pw.Image(image, fit: pw.BoxFit.contain),
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Text(
-                    'Image captured on: ${_formatDate(DateTime.now())}',
-                    style: pw.TextStyle(
-                      fontSize: 12,
-                      color: PdfColors.grey600,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        );
-      }
 
       // Get appropriate directory for the platform
       final pdfDir = await _getPdfDirectory();
@@ -370,8 +130,223 @@ class MedicalReportService {
       throw Exception('Error creating comprehensive report: $e');
     }
   }
+  
+  static pw.Widget _buildHeader() {
+    return pw.Column(
+      children: [
+        pw.Text('COLPOSCOPY REPORT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 24)),
+        pw.Text('Medical Examination Report', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey600)),
+        pw.SizedBox(height: 20),
+        pw.Divider(),
+        pw.SizedBox(height: 10),
+      ],
+    );
+  }
 
-  static pw.Widget _buildInfoRow(String label, String value) {
+  static pw.Widget _buildFooter(Patient patient, String? examiningPhysician) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Divider(),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Examining Physician: ${examiningPhysician ?? ''}'),
+                pw.SizedBox(height: 20),
+                pw.Text('Signature & Date: _________________________'),
+              ]
+            ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text('Report Generated: ${_formatDate(DateTime.now())}'),
+                pw.SizedBox(height: 5),
+                pw.Text('(This Report is not valid for Medico Legal Cases)', style: pw.TextStyle(fontStyle: pw.FontStyle.italic, fontSize: 9, color: PdfColors.grey)),
+              ]
+            )
+          ]
+        ),
+      ]
+    );
+  }
+
+  static pw.Widget _buildPatientInfoSection(Patient patient) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('PATIENT INFORMATION', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow('Name:', patient.patientName),
+                  if (patient.dateOfBirth != null)
+                    _buildInfoRow('Age:', '${DateTime.now().year - patient.dateOfBirth!.year} years'),
+                  _buildInfoRow('ID No.:', patient.patientId ?? 'N/A'),
+                  if (patient.dateOfVisit != null)
+                    _buildInfoRow('Date:', _formatDate(patient.dateOfVisit!)),
+                  _buildInfoRow('Contraceptive Method:', patient.contraception ?? 'N/A'),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 20),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (patient.lastMenstrualDate != null)
+                    _buildInfoRow('LMP:', _formatDate(patient.lastMenstrualDate!)),
+                  _buildInfoRow('Pregnancy:', patient.pregnant ?? 'N/A'),
+                  _buildInfoRow('Abortion History:', patient.abortions?.toString() ?? 'None'),
+                  _buildInfoRow('Referred By:', patient.referredBy ?? 'N/A'),
+                ],
+              ),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  static pw.Widget _buildClinicalFindings({
+    String? chiefComplaint,
+    String? cytologyReport,
+    String? pathologicalReport,
+    String? colposcopyFindings,
+    String? finalImpression,
+    String? remarks,
+  }) {
+    return pw.Column(
+      children: [
+        if (chiefComplaint != null && chiefComplaint.isNotEmpty)
+          _buildTitledCard('Chief Complaint', chiefComplaint, PdfColors.green),
+        
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            if (cytologyReport != null && cytologyReport.isNotEmpty)
+              pw.Expanded(child: _buildTitledCard('Cytology Report', cytologyReport, PdfColors.blue)),
+            pw.SizedBox(width: 10),
+            if (pathologicalReport != null && pathologicalReport.isNotEmpty)
+              pw.Expanded(child: _buildTitledCard('Pathological Report', pathologicalReport, PdfColors.purple)),
+          ],
+        ),
+        
+        if (colposcopyFindings != null && colposcopyFindings.isNotEmpty)
+          _buildTitledCard('Colposcopy Findings', colposcopyFindings, PdfColors.orange),
+
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            if (finalImpression != null && finalImpression.isNotEmpty)
+              pw.Expanded(child: _buildTitledCard('Final Impression', finalImpression, PdfColors.red)),
+            pw.SizedBox(width: 10),
+            if (remarks != null && remarks.isNotEmpty)
+              pw.Expanded(child: _buildTitledCard('Remarks', remarks, PdfColors.grey)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildForensicExamination(Map<String, String> details) {
+    List<pw.Widget> leftColumn = [];
+    List<pw.Widget> rightColumn = [];
+    
+    final allKeys = [
+      'Foreign Bodies', 'Skin/Mucosal Trauma', 'Swab Sample', 'Staining Effect',
+      'Green Filter', 'Anal Injuries', 'Posterior Fourchette', 'Erythema'
+    ];
+
+    int i = 0;
+    for (var key in allKeys) {
+      if (details.containsKey(key)) {
+        final widget = _buildInfoRow(key + ':', details[key]!, bold: false);
+        if (i < 4) {
+          leftColumn.add(widget);
+        } else {
+          rightColumn.add(widget);
+        }
+        i++;
+      }
+    }
+
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: leftColumn)),
+        pw.SizedBox(width: 20),
+        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: rightColumn)),
+      ],
+    );
+  }
+
+  static pw.Widget _buildImageGrid(List<Uint8List> images) {
+    return pw.GridView(
+      crossAxisCount: 3,
+      childAspectRatio: 1.0,
+      children: images.asMap().entries.map((entry) {
+        final index = entry.key;
+        final imageBytes = entry.value;
+        final image = pw.MemoryImage(imageBytes);
+        return pw.Column(
+          children: [
+            pw.Expanded(child: pw.Image(image, fit: pw.BoxFit.contain)),
+            pw.SizedBox(height: 5),
+            pw.Text('Image ${index + 1}', style: const pw.TextStyle(fontSize: 10)),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  static pw.Widget _buildTitledCard(String title, String content, PdfColor color) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(left: pw.BorderSide(color: color, width: 3)),
+        color: PdfColors.grey100,
+      ),
+      padding: const pw.EdgeInsets.all(10),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: color)),
+          pw.SizedBox(height: 5),
+          pw.Text(content),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildColoredCard(String title, String content, PdfColor color) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 10),
+      decoration: pw.BoxDecoration(
+        color: color,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
+      ),
+      padding: const pw.EdgeInsets.all(10),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 5),
+          pw.Text(content),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildInfoRow(String label, String value, {bool bold = true}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(
@@ -381,17 +356,11 @@ class MedicalReportService {
             width: 120,
             child: pw.Text(
               label,
-              style: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 12,
-              ),
+              style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
             ),
           ),
           pw.Expanded(
-            child: pw.Text(
-              value,
-              style: const pw.TextStyle(fontSize: 12),
-            ),
+            child: pw.Text(value),
           ),
         ],
       ),
@@ -402,34 +371,18 @@ class MedicalReportService {
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
-  static bool _hasObstetricHistory(Patient patient) {
-    return patient.liveBirths != null ||
-           patient.stillBirths != null ||
-           patient.abortions != null ||
-           patient.cesareans != null ||
-           patient.miscarriages != null;
-  }
-
-  static bool _hasTestResults(Patient patient) {
-    return patient.hpvTest != null ||
-           patient.hpvResult != null ||
-           patient.hpvDate != null ||
-           patient.hcgTest != null ||
-           patient.hcgDate != null ||
-           patient.hcgLevel != null;
-  }
-
   static Future<String> _getPdfDirectory() async {
-    if (Platform.isWindows || Platform.isLinux) {
-      // For desktop platforms, use documents directory
+    // For desktop platforms, use documents directory and a specific subfolder
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       final documentsDir = await getApplicationDocumentsDirectory();
-      final pdfDir = Directory('${documentsDir.path}/Medical_Reports');
+      final pdfDir = Directory('${documentsDir.path}/GrivaReports/Colposcopy');
       if (!await pdfDir.exists()) {
         await pdfDir.create(recursive: true);
       }
       return pdfDir.path;
-    } else {
-      // For mobile platforms, use app documents directory
+    } 
+    // For mobile platforms, use app documents directory
+    else {
       final directory = await getApplicationDocumentsDirectory();
       return directory.path;
     }
@@ -437,9 +390,12 @@ class MedicalReportService {
 
   static Future<void> openReport(String filePath) async {
     try {
-      await OpenFile.open(filePath);
+      final result = await OpenFile.open(filePath);
+      if (result.type != ResultType.done) {
+        throw Exception('Could not open file: ${result.message}');
+      }
     } catch (e) {
       throw Exception('Error opening report: $e');
     }
   }
-} 
+}

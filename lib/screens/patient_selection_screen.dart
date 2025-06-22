@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import '../services/patient_service.dart';
 import '../services/medical_report_service.dart';
+import 'clinical_data_form_screen.dart';
 
 class PatientSelectionScreen extends StatefulWidget {
   final List<Uint8List> images;
@@ -56,9 +57,15 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
       return;
     }
 
-    // Show dialog to get additional information
-    final result = await _showReportDetailsDialog();
-    if (result == null) return;
+    // Navigate to the new clinical data form
+    final reportData = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ClinicalDataFormScreen(),
+      ),
+    );
+
+    if (reportData == null) return; // User cancelled
 
     try {
       setState(() {
@@ -68,10 +75,16 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
       final filePath = await MedicalReportService.generateComprehensiveReport(
         patient: _selectedPatient!,
         images: widget.images,
-        additionalNotes: result['notes'],
-        diagnosis: result['diagnosis'],
-        treatmentPlan: result['treatmentPlan'],
-        followUpDate: result['followUpDate'],
+        chiefComplaint: reportData['chiefComplaint'],
+        cytologyReport: reportData['cytologyReport'],
+        pathologicalReport: reportData['pathologicalReport'],
+        colposcopyFindings: reportData['colposcopyFindings'],
+        finalImpression: reportData['finalImpression'],
+        remarks: reportData['remarks'],
+        treatmentProvided: reportData['treatmentProvided'],
+        precautions: reportData['precautions'],
+        examiningPhysician: reportData['examiningPhysician'],
+        forensicExamination: reportData['forensicExamination'] as Map<String, String>?,
       );
 
       if (mounted && filePath != null) {
@@ -101,114 +114,6 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
         });
       }
     }
-  }
-
-  Future<Map<String, String>?> _showReportDetailsDialog() async {
-    final diagnosisController = TextEditingController();
-    final treatmentPlanController = TextEditingController();
-    final followUpDateController = TextEditingController();
-    final notesController = TextEditingController();
-
-    return showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text(
-          'Report Details',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: diagnosisController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Diagnosis',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white70),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: treatmentPlanController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Treatment Plan',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white70),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: followUpDateController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Follow-up Date (DD/MM/YYYY)',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white70),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: notesController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Additional Notes',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white70),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-                maxLines: 4,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, {
-                'diagnosis': diagnosisController.text.trim(),
-                'treatmentPlan': treatmentPlanController.text.trim(),
-                'followUpDate': followUpDateController.text.trim(),
-                'notes': notesController.text.trim(),
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Generate Report'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
