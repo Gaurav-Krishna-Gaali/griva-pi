@@ -295,8 +295,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    const streamUrl = 'http://192.168.1.150:5000/?action=stream';
-    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    // const streamUrl = 'http://192.168.1.150:5000/?action=stream';
+    const streamUrl = 'http://127.0.0.1:5000/video_feed';
 
     return Scaffold(
       backgroundColor: Colors.black,

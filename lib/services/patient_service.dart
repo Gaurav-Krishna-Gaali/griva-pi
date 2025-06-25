@@ -42,6 +42,20 @@ class Patient {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  // New fields for the report
+  final String? chiefComplaint;
+  final String? cytologyReport;
+  final String? pathologicalReport;
+  final String? colposcopyFindings;
+  final String? finalImpression;
+  final String? remarks;
+  final String? treatmentProvided;
+  final String? precautions;
+  final String? examiningPhysician;
+
+  // Forensic Examination Fields - stored as a JSON string in DB
+  final Map<String, String>? forensicExamination;
+
   Patient({
     this.id,
     required this.patientName,
@@ -80,6 +94,16 @@ class Patient {
     this.patientSummary,
     this.createdAt,
     this.updatedAt,
+    this.chiefComplaint,
+    this.cytologyReport,
+    this.pathologicalReport,
+    this.colposcopyFindings,
+    this.finalImpression,
+    this.remarks,
+    this.treatmentProvided,
+    this.precautions,
+    this.examiningPhysician,
+    this.forensicExamination,
   });
 
   Map<String, dynamic> toMap() {
@@ -121,6 +145,16 @@ class Patient {
       'patient_summary': patientSummary,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'chief_complaint': chiefComplaint,
+      'cytology_report': cytologyReport,
+      'pathological_report': pathologicalReport,
+      'colposcopy_findings': colposcopyFindings,
+      'final_impression': finalImpression,
+      'remarks': remarks,
+      'treatment_provided': treatmentProvided,
+      'precautions': precautions,
+      'examining_physician': examiningPhysician,
+      'forensic_examination': forensicExamination != null ? jsonEncode(forensicExamination) : null,
     };
   }
 
@@ -135,6 +169,19 @@ class Patient {
         } catch (e) {
           return null;
         }
+      }
+    }
+
+    Map<String, String>? decodeForensic(String? json) {
+      if (json == null) return null;
+      try {
+        final decoded = jsonDecode(json);
+        if (decoded is Map) {
+          return decoded.map((key, value) => MapEntry(key.toString(), value.toString()));
+        }
+        return null;
+      } catch (e) {
+        return null;
       }
     }
 
@@ -176,6 +223,16 @@ class Patient {
       patientSummary: map['patient_summary'],
       createdAt: parseDate(map['created_at']),
       updatedAt: parseDate(map['updated_at']),
+      chiefComplaint: map['chief_complaint'],
+      cytologyReport: map['cytology_report'],
+      pathologicalReport: map['pathological_report'],
+      colposcopyFindings: map['colposcopy_findings'],
+      finalImpression: map['final_impression'],
+      remarks: map['remarks'],
+      treatmentProvided: map['treatment_provided'],
+      precautions: map['precautions'],
+      examiningPhysician: map['examining_physician'],
+      forensicExamination: decodeForensic(map['forensic_examination']),
     );
   }
 }
@@ -252,7 +309,17 @@ class PatientService {
               hcg_level REAL,
               patient_summary TEXT,
               created_at TEXT,
-              updated_at TEXT
+              updated_at TEXT,
+              chief_complaint TEXT,
+              cytology_report TEXT,
+              pathological_report TEXT,
+              colposcopy_findings TEXT,
+              final_impression TEXT,
+              remarks TEXT,
+              treatment_provided TEXT,
+              precautions TEXT,
+              examining_physician TEXT,
+              forensic_examination TEXT
             )
           ''');
           print('Database table created successfully'); // Debug log
@@ -269,7 +336,8 @@ class PatientService {
 
   Future<List<Patient>> getAllPatients() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(tableName);
+    await _addMissingColumns(db);
+    final List<Map<String, dynamic>> maps = await db.query(tableName, orderBy: 'updated_at DESC');
     return List.generate(maps.length, (i) => Patient.fromMap(maps[i]));
   }
 
@@ -354,5 +422,38 @@ class PatientService {
         await createPatient(patient);
       }
     }
+  }
+
+  Future<void> _addMissingColumns(Database db) async {
+    List<String> columns = (await db.rawQuery('PRAGMA table_info($tableName)'))
+        .map((row) => row['name'] as String)
+        .toList();
+
+    Map<String, String> newColumns = {
+      'chief_complaint': 'TEXT',
+      'cytology_report': 'TEXT',
+      'pathological_report': 'TEXT',
+      'colposcopy_findings': 'TEXT',
+      'final_impression': 'TEXT',
+      'remarks': 'TEXT',
+      'treatment_provided': 'TEXT',
+      'precautions': 'TEXT',
+      'examining_physician': 'TEXT',
+      'forensic_examination': 'TEXT'
+    };
+
+    for (var col in newColumns.entries) {
+      if (!columns.contains(col.key)) {
+        await db.execute('ALTER TABLE $tableName ADD COLUMN ${col.key} ${col.value}');
+      }
+    }
+  }
+
+  Future<void> deleteAllPatients() async {
+    final db = await database;
+    await db.delete(
+      tableName,
+      where: '1 = 1',
+    );
   }
 } 
