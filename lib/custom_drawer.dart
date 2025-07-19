@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 
 class CustomDrawer extends StatelessWidget {
+  final VoidCallback? onLogout;
+
+  const CustomDrawer({Key? key, this.onLogout}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -63,6 +67,7 @@ class CustomDrawer extends StatelessWidget {
             icon: Icons.logout,
             title: 'Logout',
             showDivider: true,
+            onTap: onLogout,
           ),
           SizedBox(height: 16),
           Text(
@@ -85,6 +90,7 @@ class CustomDrawer extends StatelessWidget {
     Color? backgroundColor,
     Color? textColor,
     bool showDivider = false,
+    VoidCallback? onTap,
   }) {
     return Column(
       children: [
@@ -113,6 +119,7 @@ class CustomDrawer extends StatelessWidget {
             visualDensity: VisualDensity(horizontal: -4, vertical: -4),
             horizontalTitleGap: 24, // Increased from 8 to 24 for more spacing
             minLeadingWidth: 20,
+            onTap: onTap,
           ),
         ),
       ],

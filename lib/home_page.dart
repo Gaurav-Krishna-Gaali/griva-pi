@@ -7,6 +7,7 @@ import 'screens/patient_list_screen.dart';
 import 'services/patient_service.dart';
 import 'screens/patient_form_screen.dart';
 import 'main.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -56,10 +57,40 @@ class _HomePageState extends State<HomePage> with RouteAware {
     });
   }
 
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Logout'),
+          content: Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to login page and clear the navigation stack
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => GrivaLoginPage()),
+                  (route) => false,
+                );
+              },
+              child: Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: CustomDrawer(),
+      drawer: CustomDrawer(onLogout: _logout),
       appBar: CustomAppBar(
         onMenuSelected: (String value) {
           // Handle menu item selection
@@ -74,7 +105,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
               // Handle Bluetooth selection
               break;
             case 'logout':
-              // Handle logout
+              _logout();
               break;
             case 'profile':
               // Navigate to profile
@@ -84,9 +115,6 @@ class _HomePageState extends State<HomePage> with RouteAware {
               break;
             case 'support':
               // Navigate to support
-              break;
-            case 'logout':
-              // Handle logout
               break;
           }
         },
