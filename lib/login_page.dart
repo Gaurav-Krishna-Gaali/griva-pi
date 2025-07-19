@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 // import 'package:google_fonts/google_fonts.dart';
 import 'home_page.dart';
+import 'services/user_service.dart';
 
 class GrivaLoginPage extends StatefulWidget {
   const GrivaLoginPage({Key? key}) : super(key: key);
@@ -28,15 +29,14 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
   bool _obscureConfirmPassword = true;
   bool _isSignupLoading = false;
 
-  final String _validEmail = 'doctor@griva.com';
-  final String _validPassword = 'GrivaDoc2024!';
+  final UserService _userService = UserService();
 
   @override
   void initState() {
     super.initState();
-    // Prepopulate the email and password fields
-    _emailController.text = _validEmail;
-    _passwordController.text = _validPassword;
+    // Prepopulate with default admin credentials for testing
+    _emailController.text = 'admin@griva.com';
+    _passwordController.text = 'admin123';
   }
 
   void _toggleMode() {
@@ -50,16 +50,21 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
       _isLoading = true;
     });
 
-    // Simulate network delay
-    await Future.delayed(Duration(seconds: 2));
+    try {
+      final user = await _userService.authenticateUser(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
 
-    if (_emailController.text == _validEmail &&
-        _passwordController.text == _validPassword) {
-      // Successful login
-      _showSuccessDialog('Login Successful');
-    } else {
-      // Failed login
-      _showErrorDialog('Invalid email or password');
+      if (user != null) {
+        // Successful login
+        _showSuccessDialog('Welcome back, ${user.fullName}!');
+      } else {
+        // Failed login
+        _showErrorDialog('Invalid email or password. Please check your credentials.');
+      }
+    } catch (e) {
+      _showErrorDialog('Login failed: ${e.toString()}');
     }
 
     setState(() {
@@ -77,12 +82,44 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
       _isSignupLoading = true;
     });
 
-    // Simulate network delay
-    await Future.delayed(Duration(seconds: 2));
+    try {
+      // Check if email already exists
+      final existingUser = await _userService.getUserByEmail(_signupEmailController.text.trim());
+      if (existingUser != null) {
+        _showErrorDialog('An account with this email already exists.');
+        setState(() {
+          _isSignupLoading = false;
+        });
+        return;
+      }
 
-    // Simulate successful signup
-    _showSuccessDialog('Account created successfully! Please wait for admin approval.');
-    
+      // Create new user (automatically approved)
+      final newUser = User(
+        fullName: _signupNameController.text.trim(),
+        email: _signupEmailController.text.trim(),
+        password: _signupPasswordController.text,
+        medicalLicense: _signupLicenseController.text.trim(),
+        hospital: _signupHospitalController.text.trim(),
+        role: 'doctor', // New users are automatically approved as doctors
+        isActive: true, // Automatically active
+      );
+
+      await _userService.createUser(newUser);
+      
+      // Clear form
+      _signupNameController.clear();
+      _signupEmailController.clear();
+      _signupPasswordController.clear();
+      _signupConfirmPasswordController.clear();
+      _signupLicenseController.clear();
+      _signupHospitalController.clear();
+
+      _showSuccessDialog('Account created successfully! You can now log in with your credentials.');
+      
+    } catch (e) {
+      _showErrorDialog('Signup failed: ${e.toString()}');
+    }
+
     setState(() {
       _isSignupLoading = false;
     });
@@ -139,7 +176,12 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   if (!_isSignupMode) {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+                    Navigator.pushReplacement(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) => HomePage(userEmail: _emailController.text.trim()),
+                      ),
+                    );
                   } else {
                     // Switch back to login mode after successful signup
                     setState(() {
@@ -209,85 +251,88 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Logo and Title
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'GRIVA',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+      body: SingleChildScrollView(
+        child: Center(
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Logo and Title
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'GRIVA',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  Text(
-                    ' Colposcope',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w300,
-                      color: Colors.black87,
+                    Text(
+                      ' Colposcope',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w300,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 32),
-
-              // Welcome Text
-              Text(
-                _isSignupMode ? 'Create Account' : 'Welcome Doctor!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  ],
                 ),
-              ),
-              Text(
-                _isSignupMode 
-                    ? 'Please fill in your details to register'
-                    : 'Please sign in to continue',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              SizedBox(height: 32),
+                SizedBox(height: 32),
 
-              // Form Content
-              if (_isSignupMode) _buildSignupForm() else _buildLoginForm(),
-
-              SizedBox(height: 16),
-
-              // Toggle between Login and Signup
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_isSignupMode 
-                      ? 'Already have an account?'
-                      : 'New to Griva Colposcope?'),
-                  TextButton(
-                    onPressed: _toggleMode,
-                    child: Text(
-                      _isSignupMode ? 'Sign In' : 'Sign Up',
-                      style: TextStyle(color: Colors.blue),
-                    ),
+                // Welcome Text
+                Text(
+                  _isSignupMode ? 'Create Account' : 'Welcome Doctor!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
-                ],
-              ),
-              SizedBox(height: 16),
+                ),
+                Text(
+                  _isSignupMode 
+                      ? 'Please fill in your details to register'
+                      : 'Please sign in to continue',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                SizedBox(height: 32),
 
-              // Terms and Privacy
-              Text(
-                'By ${_isSignupMode ? 'creating an account' : 'signing in'}, you agree to our Terms of Service and Privacy Policy',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 10, color: Colors.grey),
-              ),
-            ],
+                // Form Content
+                if (_isSignupMode) _buildSignupForm() else _buildLoginForm(),
+
+                SizedBox(height: 16),
+
+                // Toggle between Login and Signup
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_isSignupMode 
+                        ? 'Already have an account?'
+                        : 'New to Griva Colposcope?'),
+                    TextButton(
+                      onPressed: _toggleMode,
+                      child: Text(
+                        _isSignupMode ? 'Sign In' : 'Sign Up',
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+
+                // Terms and Privacy
+                Text(
+                  'By ${_isSignupMode ? 'creating an account' : 'signing in'}, you agree to our Terms of Service and Privacy Policy',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+                SizedBox(height: 32), // Add extra padding at bottom
+              ],
+            ),
           ),
         ),
       ),

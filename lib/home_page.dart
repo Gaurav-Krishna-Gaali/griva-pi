@@ -5,12 +5,16 @@ import 'custom_drawer.dart';
 import 'exam_screen.dart';
 import 'screens/patient_list_screen.dart';
 import 'services/patient_service.dart';
+import 'services/user_service.dart';
 import 'screens/patient_form_screen.dart';
+import 'screens/user_profile_screen.dart';
 import 'main.dart';
 import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  final String? userEmail;
+  
+  const HomePage({Key? key, this.userEmail}) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -21,11 +25,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
   bool _showUpcoming = true;
   List<Patient> _patients = [];
   bool _isLoading = true;
+  String _userName = 'Doctor';
+  final UserService _userService = UserService();
 
   @override
   void initState() {
     super.initState();
     _fetchPatients();
+    _loadUserData();
   }
 
   @override
@@ -55,6 +62,34 @@ class _HomePageState extends State<HomePage> with RouteAware {
       _patients = patients;
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadUserData() async {
+    if (widget.userEmail != null) {
+      try {
+        final user = await _userService.getUserByEmail(widget.userEmail!);
+        if (user != null) {
+          print('Loaded user: ${user.fullName} with role: ${user.role}'); // Debug log
+          setState(() {
+            // Format the name based on role
+            if (user.role == 'admin') {
+              _userName = user.fullName;
+            } else {
+              // For doctors, add Dr. prefix if not already present
+              _userName = user.fullName.startsWith('Dr.') 
+                  ? user.fullName 
+                  : 'Dr. ${user.fullName}';
+            }
+          });
+        } else {
+          print('User not found for email: ${widget.userEmail}');
+        }
+      } catch (e) {
+        print('Error loading user data: $e');
+      }
+    } else {
+      print('No user email provided to HomePage');
+    }
   }
 
   void _logout() {
@@ -87,10 +122,28 @@ class _HomePageState extends State<HomePage> with RouteAware {
     );
   }
 
+  void _showProfile() {
+    if (widget.userEmail != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(userEmail: widget.userEmail!),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User information not available')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: CustomDrawer(onLogout: _logout),
+      drawer: CustomDrawer(
+        onLogout: _logout,
+        onProfile: _showProfile,
+      ),
       appBar: CustomAppBar(
         onMenuSelected: (String value) {
           // Handle menu item selection
@@ -108,7 +161,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
               _logout();
               break;
             case 'profile':
-              // Navigate to profile
+              _showProfile();
               break;
             case 'settings':
               // Navigate to settings
@@ -127,7 +180,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
             SizedBox(height: 24),
             Center(
               child: Text(
-                "Hello Doctor [Name]!",
+                "Hello ${_userName}!",
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,

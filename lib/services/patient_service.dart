@@ -268,7 +268,7 @@ class PatientService {
       
       return await openDatabase(
         path,
-        version: 1,
+        version: 2, // Updated to version 2 to include users table
         onCreate: (Database db, int version) async {
           print('Creating new database...'); // Debug log
           await db.execute('''
@@ -322,7 +322,96 @@ class PatientService {
               forensic_examination TEXT
             )
           ''');
-          print('Database table created successfully'); // Debug log
+          
+          // Create users table
+          await db.execute('''
+            CREATE TABLE users(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              full_name TEXT NOT NULL,
+              email TEXT UNIQUE NOT NULL,
+              password TEXT NOT NULL,
+              medical_license TEXT NOT NULL,
+              hospital TEXT NOT NULL,
+              role TEXT DEFAULT 'pending',
+              is_active INTEGER DEFAULT 0,
+              last_login TEXT,
+              created_at TEXT,
+              updated_at TEXT,
+              profile_image TEXT,
+              phone_number TEXT,
+              specialization TEXT,
+              department TEXT
+            )
+          ''');
+          
+          // Insert default admin user
+          final now = DateTime.now().toIso8601String();
+          final adminUser = {
+            'full_name': 'System Administrator',
+            'email': 'admin@griva.com',
+            'password': 'admin123',
+            'medical_license': 'ADMIN001',
+            'hospital': 'Griva Medical Systems',
+            'role': 'admin',
+            'is_active': 1,
+            'created_at': now,
+            'updated_at': now,
+          };
+          
+          try {
+            await db.insert('users', adminUser);
+          } catch (e) {
+            print('Admin user might already exist: $e');
+          }
+          
+          print('Database tables created successfully'); // Debug log
+        },
+        onUpgrade: (Database db, int oldVersion, int newVersion) async {
+          print('Upgrading database from version $oldVersion to $newVersion');
+          if (oldVersion < 2) {
+            // Create users table for existing databases
+            await db.execute('''
+              CREATE TABLE users(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                medical_license TEXT NOT NULL,
+                hospital TEXT NOT NULL,
+                role TEXT DEFAULT 'pending',
+                is_active INTEGER DEFAULT 0,
+                last_login TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                profile_image TEXT,
+                phone_number TEXT,
+                specialization TEXT,
+                department TEXT
+              )
+            ''');
+            
+            // Insert default admin user
+            final now = DateTime.now().toIso8601String();
+            final adminUser = {
+              'full_name': 'System Administrator',
+              'email': 'admin@griva.com',
+              'password': 'admin123',
+              'medical_license': 'ADMIN001',
+              'hospital': 'Griva Medical Systems',
+              'role': 'admin',
+              'is_active': 1,
+              'created_at': now,
+              'updated_at': now,
+            };
+            
+            try {
+              await db.insert('users', adminUser);
+            } catch (e) {
+              print('Admin user might already exist: $e');
+            }
+            
+            print('Users table created and admin user inserted');
+          }
         },
         onOpen: (db) {
           print('Database opened successfully'); // Debug log

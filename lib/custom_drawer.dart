@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 
 class CustomDrawer extends StatelessWidget {
   final VoidCallback? onLogout;
+  final VoidCallback? onProfile;
 
-  const CustomDrawer({Key? key, this.onLogout}) : super(key: key);
+  const CustomDrawer({Key? key, this.onLogout, this.onProfile}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +52,7 @@ class CustomDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   icon: Icons.person_outline,
                   title: 'Profile',
+                  onTap: onProfile,
                 ),
                 _buildDrawerItem(
                   icon: Icons.settings_outlined,
