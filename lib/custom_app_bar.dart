@@ -3,8 +3,9 @@ import 'connect_colposcope_screen.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Function(String) onMenuSelected;
+  final Key? infoIconKey;
 
-  const CustomAppBar({Key? key, required this.onMenuSelected}) : super(key: key);
+  const CustomAppBar({Key? key, required this.onMenuSelected, this.infoIconKey}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +41,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.info_outline, color: Color(0xFF8B44F7)),
+          key: infoIconKey,
+          icon: Icon(Icons.precision_manufacturing, color: Color(0xFF8B44F7)),
           onPressed: () {
             bool showDeviceSetup = false;
             showDialog(
