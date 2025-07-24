@@ -45,51 +45,66 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
-        backgroundColor: Colors.purple[300],
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF8B44F7),
+        elevation: 1,
+        iconTheme: IconThemeData(color: Color(0xFF8B44F7)),
       ),
+      backgroundColor: Colors.white,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _user == null
               ? const Center(child: Text('User not found'))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Profile Header
-                      Center(
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor: Colors.purple[100],
-                              child: Icon(
-                                Icons.person,
-                                size: 50,
-                                color: Colors.purple[600],
+                      // Modern Profile Header Card
+                      Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Color(0xFF8B44F7), width: 1.5),
+                        ),
+                        color: Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                          child: Column(
+                            children: [
+                              CircleAvatar(
+                                radius: 48,
+                                backgroundColor: Color(0xFFF3EDFC),
+                                child: Icon(
+                                  Icons.person,
+                                  size: 48,
+                                  color: Color(0xFF8B44F7),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _user!.fullName,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(height: 18),
+                              Text(
+                                _user!.fullName,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
                               ),
-                            ),
-                            Text(
-                              _user!.role.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
+                              const SizedBox(height: 4),
+                              Text(
+                                _user!.role.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Color(0xFF8B44F7),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.2,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
 
                       // Profile Information
                       _buildInfoSection('Personal Information', [
@@ -99,7 +114,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           _buildInfoRow('Phone', _user!.phoneNumber!),
                       ]),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
 
                       _buildInfoSection('Medical Information', [
                         _buildInfoRow('Medical License', _user!.medicalLicense),
@@ -110,7 +125,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           _buildInfoRow('Department', _user!.department!),
                       ]),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
 
                       _buildInfoSection('Account Information', [
                         _buildInfoRow('Status', _user!.isActive ? 'Active' : 'Inactive'),
@@ -123,24 +138,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             '${_user!.lastLogin!.day}/${_user!.lastLogin!.month}/${_user!.lastLogin!.year}'),
                       ]),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
 
-                      // Action Buttons
-                      Center(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            // TODO: Implement edit profile functionality
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Edit profile functionality coming soon!')),
-                            );
-                          },
-                          icon: const Icon(Icons.edit),
-                          label: const Text('Edit Profile'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple[300],
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      // Action Button
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _showEditProfileModal();
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit Profile'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF8B44F7),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          textStyle: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -156,17 +170,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: Color(0xFF8B44F7),
+            letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[200]!),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Color(0xFFE0E0E0)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x1A8B44F7),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             children: children,
@@ -178,17 +200,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 110,
             child: Text(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
+                color: Color(0xFF8B44F7),
+                fontSize: 13,
               ),
             ),
           ),
@@ -197,11 +220,162 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.w400,
+                fontSize: 13.5,
+                color: Colors.black87,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showEditProfileModal() {
+    final nameController = TextEditingController(text: _user?.fullName ?? '');
+    final phoneController = TextEditingController(text: _user?.phoneNumber ?? '');
+    final licenseController = TextEditingController(text: _user?.medicalLicense ?? '');
+    final hospitalController = TextEditingController(text: _user?.hospital ?? '');
+    final specializationController = TextEditingController(text: _user?.specialization ?? '');
+    final departmentController = TextEditingController(text: _user?.department ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Text('Edit Profile',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Color(0xFF8B44F7),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 18),
+                _buildEditField('Full Name', nameController),
+                SizedBox(height: 12),
+                _buildEditField('Phone', phoneController, keyboardType: TextInputType.phone),
+                SizedBox(height: 12),
+                _buildEditField('Medical License', licenseController),
+                SizedBox(height: 12),
+                _buildEditField('Hospital/Clinic', hospitalController),
+                SizedBox(height: 12),
+                _buildEditField('Specialization', specializationController),
+                SizedBox(height: 12),
+                _buildEditField('Department', departmentController),
+                SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      // Validate
+                      if (nameController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Full Name cannot be empty')),
+                        );
+                        return;
+                      }
+                      Navigator.of(context).pop();
+                      setState(() { _isLoading = true; });
+                      try {
+                        final updatedUser = _user!.copyWith(
+                          fullName: nameController.text.trim(),
+                          phoneNumber: phoneController.text.trim(),
+                          medicalLicense: licenseController.text.trim(),
+                          hospital: hospitalController.text.trim(),
+                          specialization: specializationController.text.trim(),
+                          department: departmentController.text.trim(),
+                        );
+                        await _userService.updateUser(updatedUser.id!, updatedUser);
+                        await _loadUserProfile();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Profile updated successfully!')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to update profile: $e')),
+                          );
+                        }
+                      }
+                      setState(() { _isLoading = false; });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF8B44F7),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    child: Text('Save Changes'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEditField(String label, TextEditingController controller, {TextInputType keyboardType = TextInputType.text}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontWeight: FontWeight.w500, color: Color(0xFF8B44F7), fontSize: 13)),
+        SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Color(0xFFF7F7FA),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Color(0xFF8B44F7), width: 1),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Color(0xFF8B44F7), width: 1.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 } 
