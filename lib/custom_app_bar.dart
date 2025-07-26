@@ -9,8 +9,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Key? infoIconKey;
   final String? userEmail; // Optional user email for profile navigation
   final List<Widget>? extraActions;
+  final Widget? title; // Optional custom title
 
-  const CustomAppBar({Key? key, this.infoIconKey, this.userEmail, this.extraActions}) : super(key: key);
+  const CustomAppBar({Key? key, this.infoIconKey, this.userEmail, this.extraActions, this.title}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +26,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           },
         ),
       ),
-      title: Row(
+      title: title ?? Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(

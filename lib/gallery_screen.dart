@@ -356,6 +356,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
       ),
       appBar: CustomAppBar(
         userEmail: null, // Pass user email if available
+        title: _isSelectionMode 
+          ? Text(
+              'Select Images (${_selectedIndices.length}/${_images.length})',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+              ),
+            )
+          : null, // Use default title when not in selection mode
       ),
       backgroundColor: Colors.white,
       body: _images.isEmpty
@@ -368,6 +378,43 @@ class _GalleryScreenState extends State<GalleryScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Selection mode indicator
+                if (_isSelectionMode)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    color: const Color(0xFF6B46C1).withOpacity(0.1),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: const Color(0xFF6B46C1),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Selection Mode - Tap images to select/deselect',
+                          style: const TextStyle(
+                            color: Color(0xFF6B46C1),
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _toggleSelectionMode,
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: Color(0xFF6B46C1),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
                 // Section title and selection count
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
