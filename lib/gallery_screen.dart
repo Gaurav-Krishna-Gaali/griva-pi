@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'dart:io';
 import 'services/pdf_service.dart';
 import 'screens/patient_selection_screen.dart';
+import 'custom_app_bar.dart';
+import 'custom_drawer.dart';
 
 class GalleryScreen extends StatefulWidget {
   final List<Uint8List> images;
@@ -65,6 +67,41 @@ class _GalleryScreenState extends State<GalleryScreen> {
       } else {
         _selectedIndices.add(index);
       }
+    });
+  }
+
+  void _editSelectedImages() {
+    // TODO: Implement edit functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Edit functionality coming soon')),
+    );
+  }
+
+  void _compareSelectedImages() {
+    // TODO: Implement compare functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Compare functionality coming soon')),
+    );
+  }
+
+  void _proceedToDiagnosis() {
+    if (_selectedIndices.isEmpty) return;
+    
+    final selectedImages = _selectedIndices.map((index) => _images[index]).toList();
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PatientSelectionScreen(
+          images: selectedImages,
+        ),
+      ),
+    ).then((_) {
+      // Exit selection mode when returning from patient selection
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
     });
   }
 
@@ -303,118 +340,238 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isSelectionMode ? 'Select Images (${_selectedIndices.length})' : 'Gallery'),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        actions: [
-          if (_isSelectionMode) ...[
-            IconButton(
-              icon: const Icon(Icons.picture_as_pdf),
-              onPressed: _showPdfOptions,
-              tooltip: 'Create Report',
-            ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _toggleSelectionMode,
-              tooltip: 'Cancel Selection',
-            ),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.help_outline),
-              onPressed: _showHelpDialog,
-              tooltip: 'Help',
-            ),
-            IconButton(
-              icon: const Icon(Icons.select_all),
-              onPressed: _toggleSelectionMode,
-              tooltip: 'Select Images',
-            ),
-          ],
-        ],
+      drawer: CustomDrawer(
+        onLogout: () {
+          // TODO: Implement logout logic
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Logout clicked')),
+          );
+        },
+        onProfile: () {
+          // TODO: Implement profile logic
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile clicked')),
+          );
+        },
       ),
-      backgroundColor: Colors.black,
+      appBar: CustomAppBar(
+        userEmail: null, // Pass user email if available
+      ),
+      backgroundColor: Colors.white,
       body: _images.isEmpty
           ? const Center(
               child: Text(
                 'No images captured yet',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.grey),
               ),
             )
-          : GridView.builder(
-              padding: const EdgeInsets.all(8),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: _images.length,
-              itemBuilder: (context, index) {
-                final isSelected = _selectedIndices.contains(index);
-                return GestureDetector(
-                  onTap: () {
-                    if (_isSelectionMode) {
-                      _toggleImageSelection(index);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ImageDetailScreen(
-                            imageBytes: _images[index],
-                            onDelete: () {
-                              _deleteImage(index);
-                              Navigator.pop(context);
-                            },
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  onLongPress: () {
-                    if (!_isSelectionMode) {
-                      _toggleSelectionMode();
-                      _toggleImageSelection(index);
-                    }
-                  },
-                  child: Stack(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Section title and selection count
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: isSelected ? Colors.blue : Colors.white24,
-                            width: isSelected ? 3 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            _images[index],
-                            fit: BoxFit.cover,
-                          ),
+                      const Text(
+                        'Review and edit captured Images',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.black87,
                         ),
                       ),
-                      if (isSelected)
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${_selectedIndices.length}/${_images.length} Selected for Report',
+                        style: const TextStyle(
+                          color: Color(0xFF6B46C1), // Purple color
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
                         ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios, color: Color(0xFF6B46C1)),
+                        tooltip: 'Back',
+                        onPressed: () {
+                          Navigator.of(context).maybePop();
+                        },
+                      ),
                     ],
                   ),
-                );
-              },
+                ),
+                
+                // Action buttons when images are selected
+                if (_selectedIndices.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.edit, size: 16),
+                          label: const Text('Edit'),
+                          onPressed: _editSelectedImages,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6B46C1),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: const Size(0, 32),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.compare, size: 16),
+                          label: const Text('Compare'),
+                          onPressed: _compareSelectedImages,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6B46C1),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: const Size(0, 32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                // Image grid
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 0.7,
+                    ),
+                    itemCount: _images.length,
+                    itemBuilder: (context, index) {
+                      final isSelected = _selectedIndices.contains(index);
+                      return GestureDetector(
+                        onTap: () {
+                          if (_isSelectionMode) {
+                            _toggleImageSelection(index);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ImageDetailScreen(
+                                  imageBytes: _images[index],
+                                  onDelete: () {
+                                    _deleteImage(index);
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onLongPress: () {
+                          if (!_isSelectionMode) {
+                            _toggleSelectionMode();
+                            _toggleImageSelection(index);
+                          }
+                        },
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFF6B46C1) : Colors.grey.shade300,
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.memory(
+                                        _images[index],
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF6B46C1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Cervix Image ${index + 1}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 3,
+              offset: const Offset(0, -1),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                '© 2025 Griya. All rights reserved.',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.arrow_forward, size: 16),
+              label: const Text('Proceed to Diagnosis'),
+              onPressed: _selectedIndices.isNotEmpty ? _proceedToDiagnosis : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6B46C1),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                minimumSize: const Size(0, 40),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

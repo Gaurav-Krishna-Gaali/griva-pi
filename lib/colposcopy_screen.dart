@@ -56,34 +56,7 @@ class _ColposcopyDetailsScreenState extends State<ColposcopyDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: CustomDrawer(),
-      appBar: CustomAppBar(
-        onMenuSelected: (String value) {
-          // Handle menu item selection
-          switch (value) {
-            case 'wifi':
-              // Handle Wifi selection
-              break;
-            case 'microphone':
-              // Handle Microphone selection
-              break;
-            case 'bluetooth':
-              // Handle Bluetooth selection
-              break;
-            case 'logout':
-              // Handle logout
-              break;
-            case 'profile':
-              // Navigate to profile
-              break;
-            case 'settings':
-              // Navigate to settings
-              break;
-            case 'support':
-              // Navigate to support
-              break;
-          }
-        },
-      ),
+      appBar: CustomAppBar(),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),

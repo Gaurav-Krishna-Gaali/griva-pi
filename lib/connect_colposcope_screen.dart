@@ -11,11 +11,7 @@ class ConnectColposcopeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Color(0xFFF7F7FA),
       drawer: CustomDrawer(),
-      appBar: CustomAppBar(
-        onMenuSelected: (String value) {
-          // Add menu handling if needed
-        },
-      ),
+      appBar: CustomAppBar(),
       body: Center(
         child: SingleChildScrollView(
           child: Center(
