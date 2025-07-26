@@ -368,218 +368,238 @@ class _GalleryScreenState extends State<GalleryScreen> {
           : null, // Use default title when not in selection mode
       ),
       backgroundColor: Colors.white,
-      body: _images.isEmpty
-          ? const Center(
-              child: Text(
-                'No images captured yet',
-                style: TextStyle(color: Colors.grey),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Back button - always visible
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios, color: Color(0xFF6B46C1)),
+                  tooltip: 'Back',
+                  onPressed: () {
+                    Navigator.of(context).maybePop();
+                  },
+                ),
+              ],
+            ),
+          ),
+          
+          // Main content
+          if (_images.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'No images captured yet',
+                  style: TextStyle(color: Colors.grey),
+                ),
               ),
             )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Selection mode indicator
-                if (_isSelectionMode)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    color: const Color(0xFF6B46C1).withOpacity(0.1),
+          else
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Selection mode indicator
+                  if (_isSelectionMode)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      color: const Color(0xFF6B46C1).withOpacity(0.1),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: const Color(0xFF6B46C1),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Selection Mode - Tap images to select/deselect',
+                            style: const TextStyle(
+                              color: Color(0xFF6B46C1),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: _toggleSelectionMode,
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: Color(0xFF6B46C1),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  // Section title and selection count
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.check_circle,
-                          color: const Color(0xFF6B46C1),
-                          size: 20,
+                        const Text(
+                          'Review and edit captured Images',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.black87,
+                          ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 12),
                         Text(
-                          'Selection Mode - Tap images to select/deselect',
+                          '${_selectedIndices.length}/${_images.length} Selected for Report',
                           style: const TextStyle(
-                            color: Color(0xFF6B46C1),
+                            color: Color(0xFF6B46C1), // Purple color
                             fontWeight: FontWeight.w500,
                             fontSize: 14,
                           ),
                         ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _toggleSelectionMode,
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(
-                              color: Color(0xFF6B46C1),
-                              fontWeight: FontWeight.w600,
+                      ],
+                    ),
+                  ),
+                  
+                  // Action buttons when images are selected
+                  if (_selectedIndices.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: const Text('Edit'),
+                            onPressed: _editSelectedImages,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6B46C1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              minimumSize: const Size(0, 32),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                
-                // Section title and selection count
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Review and edit captured Images',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '${_selectedIndices.length}/${_images.length} Selected for Report',
-                        style: const TextStyle(
-                          color: Color(0xFF6B46C1), // Purple color
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.arrow_forward_ios, color: Color(0xFF6B46C1)),
-                        tooltip: 'Back',
-                        onPressed: () {
-                          Navigator.of(context).maybePop();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Action buttons when images are selected
-                if (_selectedIndices.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Edit'),
-                          onPressed: _editSelectedImages,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6B46C1),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: const Size(0, 32),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.compare, size: 16),
+                            label: const Text('Compare'),
+                            onPressed: _compareSelectedImages,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6B46C1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              minimumSize: const Size(0, 32),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.compare, size: 16),
-                          label: const Text('Compare'),
-                          onPressed: _compareSelectedImages,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6B46C1),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: const Size(0, 32),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                
-                // Image grid
-                Expanded(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.7,
-                    ),
-                    itemCount: _images.length,
-                    itemBuilder: (context, index) {
-                      final isSelected = _selectedIndices.contains(index);
-                      return GestureDetector(
-                        onTap: () {
-                          if (_isSelectionMode) {
-                            _toggleImageSelection(index);
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ImageDetailScreen(
-                                  imageBytes: _images[index],
-                                  onDelete: () {
-                                    _deleteImage(index);
-                                    Navigator.pop(context);
-                                  },
+                  
+                  // Image grid
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 0.7,
+                      ),
+                      itemCount: _images.length,
+                      itemBuilder: (context, index) {
+                        final isSelected = _selectedIndices.contains(index);
+                        return GestureDetector(
+                          onTap: () {
+                            if (_isSelectionMode) {
+                              _toggleImageSelection(index);
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ImageDetailScreen(
+                                    imageBytes: _images[index],
+                                    onDelete: () {
+                                      _deleteImage(index);
+                                      Navigator.pop(context);
+                                    },
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          onLongPress: () {
+                            if (!_isSelectionMode) {
+                              _toggleSelectionMode();
+                              _toggleImageSelection(index);
+                            }
+                          },
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: isSelected ? const Color(0xFF6B46C1) : Colors.grey.shade300,
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.memory(
+                                          _images[index],
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF6B46C1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.check,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
-                            );
-                          }
-                        },
-                        onLongPress: () {
-                          if (!_isSelectionMode) {
-                            _toggleSelectionMode();
-                            _toggleImageSelection(index);
-                          }
-                        },
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isSelected ? const Color(0xFF6B46C1) : Colors.grey.shade300,
-                                        width: isSelected ? 2 : 1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.memory(
-                                        _images[index],
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isSelected)
-                                    Positioned(
-                                      top: 8,
-                                      right: 8,
-                                      child: Container(
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF6B46C1),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.check,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'Cervix Image ${index + 1}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Cervix Image ${index + 1}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+        ],
+      ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
