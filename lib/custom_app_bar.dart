@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'connect_colposcope_screen.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Function(String) onMenuSelected;
+  final Key? infoIconKey;
 
-  const CustomAppBar({Key? key, required this.onMenuSelected}) : super(key: key);
+  const CustomAppBar({Key? key, required this.onMenuSelected, this.infoIconKey}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +40,245 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        IconButton(
+          key: infoIconKey,
+          icon: Icon(Icons.precision_manufacturing, color: Color(0xFF8B44F7)),
+          onPressed: () {
+            bool showDeviceSetup = false;
+            showDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.4),
+              builder: (BuildContext context) {
+                return Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 420),
+                    child: StatefulBuilder(
+                      builder: (context, setState) {
+                        return showDeviceSetup
+                          ? Stack(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Color(0xFFF3EDFC),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black12,
+                                              blurRadius: 8,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        padding: EdgeInsets.all(16),
+                                        child: Icon(Icons.usb_rounded, color: Color(0xFF8B44F7), size: 32),
+                                      ),
+                                      SizedBox(height: 24),
+                                      Text(
+                                        'Device Setup',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 20,
+                                          color: Colors.black,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      SizedBox(height: 12),
+                                      Text(
+                                        'Please complete the following steps to prepare your Colposcope device for connection.',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.black87,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      SizedBox(height: 24),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Color(0xFFF8F8F8),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Color(0xFFE0E0E0)),
+                                        ),
+                                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.power_settings_new, color: Color(0xFF8B44F7)),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Power On Device', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                                                  Text('Press the power button on your Colposcope device', style: TextStyle(fontSize: 13, color: Colors.black54)),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Color(0xFFF8F8F8),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Color(0xFFE0E0E0)),
+                                        ),
+                                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.wifi, color: Color(0xFF8B44F7)),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Enable Hotspot', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                                                  Text('Ensure the blue light is visible on the device', style: TextStyle(fontSize: 13, color: Colors.black54)),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(height: 18),
+                                      Text(
+                                        'Once both steps are complete, proceed to connection',
+                                        style: TextStyle(fontSize: 13, color: Colors.black54),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      SizedBox(height: 24),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => ConnectColposcopeScreen(),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Color(0xFF8B44F7),
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.symmetric(vertical: 14),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: Text('Continue to Connection'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: IconButton(
+                                    icon: Icon(Icons.close, color: Colors.black45),
+                                    onPressed: () => Navigator.of(context).pop(),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Color(0xFFF3EDFC),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black12,
+                                          blurRadius: 8,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    padding: EdgeInsets.all(16),
+                                    child: Icon(Icons.usb_rounded, color: Color(0xFF8B44F7), size: 32),
+                                  ),
+                                  SizedBox(height: 24),
+                                  Text(
+                                    'Connect to Colposcope?',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 20,
+                                      color: Colors.black,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'You need to connect to Griva Colposcope to begin the examination. Would you like to do it now?',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black87,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  SizedBox(height: 32),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () => Navigator.of(context).pop(),
+                                          style: OutlinedButton.styleFrom(
+                                            side: BorderSide(color: Colors.grey.shade300),
+                                            foregroundColor: Colors.black87,
+                                            padding: EdgeInsets.symmetric(vertical: 14),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: Text('Do it Later'),
+                                        ),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              showDeviceSetup = true;
+                                            });
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Color(0xFF8B44F7),
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.symmetric(vertical: 14),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: Text('Connect Now'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                      },
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
         _buildPopupMenu(onMenuSelected),
         _buildProfileMenu(onMenuSelected),
       ],

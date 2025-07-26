@@ -5,11 +5,17 @@ import 'custom_drawer.dart';
 import 'exam_screen.dart';
 import 'screens/patient_list_screen.dart';
 import 'services/patient_service.dart';
+import 'services/user_service.dart';
 import 'screens/patient_form_screen.dart';
+import 'screens/user_profile_screen.dart';
 import 'main.dart';
+import 'login_page.dart';
+import 'connect_colposcope_screen.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  final String? userEmail;
+  
+  const HomePage({Key? key, this.userEmail}) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -20,11 +26,18 @@ class _HomePageState extends State<HomePage> with RouteAware {
   bool _showUpcoming = true;
   List<Patient> _patients = [];
   bool _isLoading = true;
+  String _userName = 'Doctor';
+  final UserService _userService = UserService();
+  final GlobalKey _infoIconKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _fetchPatients();
+    _loadUserData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showNotConnectedPopup();
+    });
   }
 
   @override
@@ -56,11 +69,245 @@ class _HomePageState extends State<HomePage> with RouteAware {
     });
   }
 
+  Future<void> _loadUserData() async {
+    if (widget.userEmail != null) {
+      try {
+        final user = await _userService.getUserByEmail(widget.userEmail!);
+        if (user != null) {
+          print('Loaded user: ${user.fullName} with role: ${user.role}'); // Debug log
+          setState(() {
+            // Format the name based on role
+            if (user.role == 'admin') {
+              _userName = user.fullName;
+            } else {
+              // For doctors, add Dr. prefix if not already present
+              _userName = user.fullName.startsWith('Dr.') 
+                  ? user.fullName 
+                  : 'Dr. ${user.fullName}';
+            }
+          });
+        } else {
+          print('User not found for email: ${widget.userEmail}');
+        }
+      } catch (e) {
+        print('Error loading user data: $e');
+      }
+    } else {
+      print('No user email provided to HomePage');
+    }
+  }
+
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Logout'),
+          content: Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to login page and clear the navigation stack
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => GrivaLoginPage()),
+                  (route) => false,
+                );
+              },
+              child: Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showProfile() {
+    if (widget.userEmail != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(userEmail: widget.userEmail!),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User information not available')),
+      );
+    }
+  }
+
+  void _showNotConnectedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red[400]),
+                    SizedBox(width: 8),
+                    Text(
+                      'Not Connected',
+                      style: TextStyle(
+                        color: Colors.red[400],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'You need to connect to Griva Colposcope to begin the examination.',
+                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text('Do it Later'),
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => ConnectColposcopeScreen()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF8B44F7),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text('Connect Now'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNotConnectedPopup() async {
+    // Find the position of the info icon
+    final RenderBox? renderBox = _infoIconKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    if (renderBox != null) {
+      final position = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+      final size = renderBox.size;
+      await showMenu(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          position.dx,
+          position.dy + size.height,
+          position.dx + size.width,
+          position.dy,
+        ),
+        items: [
+          PopupMenuItem(
+            enabled: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red[400], size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Not Connected',
+                      style: TextStyle(
+                        color: Colors.red[400],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'You need to connect to Griva Colposcope to begin the examination.',
+                  style: TextStyle(fontSize: 13, color: Colors.black87),
+                ),
+                SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        minimumSize: Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text('Do it Later', style: TextStyle(fontSize: 13)),
+                    ),
+                    SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => ConnectColposcopeScreen()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF8B44F7),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        minimumSize: Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text('Connect Now', style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        elevation: 8,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: CustomDrawer(),
+      drawer: CustomDrawer(
+        onLogout: _logout,
+        onProfile: _showProfile,
+      ),
       appBar: CustomAppBar(
+        infoIconKey: _infoIconKey,
         onMenuSelected: (String value) {
           // Handle menu item selection
           switch (value) {
@@ -74,19 +321,16 @@ class _HomePageState extends State<HomePage> with RouteAware {
               // Handle Bluetooth selection
               break;
             case 'logout':
-              // Handle logout
+              _logout();
               break;
             case 'profile':
-              // Navigate to profile
+              _showProfile();
               break;
             case 'settings':
               // Navigate to settings
               break;
             case 'support':
               // Navigate to support
-              break;
-            case 'logout':
-              // Handle logout
               break;
           }
         },
@@ -99,7 +343,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
             SizedBox(height: 24),
             Center(
               child: Text(
-                "Hello Doctor [Name]!",
+                "Hello ${_userName}!",
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
