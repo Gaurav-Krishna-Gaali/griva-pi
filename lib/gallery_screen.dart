@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'dart:io';
 import 'services/pdf_service.dart';
+import 'image_edit_screen.dart';
 import 'screens/patient_selection_screen.dart';
 import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
@@ -71,10 +72,29 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   void _editSelectedImages() {
-    // TODO: Implement edit functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit functionality coming soon')),
-    );
+    if (_selectedIndices.length != 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select exactly one image to edit')),
+      );
+      return;
+    }
+
+    final index = _selectedIndices.first;
+    final bytes = _images[index];
+    Navigator.push<Uint8List?>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageEditScreen(imageBytes: bytes),
+      ),
+    ).then((editedBytes) {
+      if (editedBytes == null) return;
+      setState(() {
+        _images[index] = editedBytes;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image updated')),
+      );
+    });
   }
 
   void _compareSelectedImages() {
@@ -615,6 +635,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ),
         child: Row(
           children: [
+            IconButton(
+              onPressed: _showHelpDialog,
+              icon: const Icon(Icons.help_outline, color: Colors.grey),
+              tooltip: 'Help',
+            ),
             const Expanded(
               child: Text(
                 '© 2025 Griya. All rights reserved.',
@@ -668,7 +693,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
               '• Choose from three report types:\n'
               '  - Simple PDF: Images only\n'
               '  - Detailed Report: With patient info\n'
-              '  - Comprehensive Report: SQL data + images',
+              '  - Comprehensive Report: SQL data + images\n\n'
+              'Image Editor Features:\n'
+              '• Advanced color adjustments (brightness, contrast, saturation, hue, gamma, exposure)\n'
+              '• Medical filters (sharpening, blur, histogram equalization)\n'
+              '• Transform tools (rotate, flip)\n'
+              '• Annotation tools for marking areas of interest\n'
+              '• Undo/Redo functionality\n'
+              '• Save edited images locally',
               style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 16),
