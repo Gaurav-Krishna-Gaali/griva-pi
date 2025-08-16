@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'gallery_screen.dart';
+import 'screens/image_comparison_screen.dart';
 
 class PiCameraScreen extends StatefulWidget {
   const PiCameraScreen({super.key});
@@ -177,6 +178,20 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     );
   }
 
+  void _openComparison() {
+    if (capturedImages.isEmpty) return;
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageComparisonScreen(
+          images: capturedImages,
+          currentImage: capturedImageBytes ?? capturedImages.first,
+        ),
+      ),
+    );
+  }
+
   void _openViaOptions() {
     // Simple state change without SnackBar
     // In a real app, you would show a dialog with options
@@ -295,8 +310,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    const streamUrl = 'http://192.168.100.1:5000/?action=stream';
-    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    // const streamUrl = 'http://192.168.100.1:5000/?action=stream';
+    const streamUrl = 'http://127.0.0.1:5000/video_feed';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -367,6 +382,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     IconButton(
                       icon: const Icon(Icons.info_outline, color: Colors.white),
                       onPressed: () {},
+                    ),
+                    // Compare images button
+                    IconButton(
+                      icon: const Icon(Icons.compare, color: Colors.white),
+                      onPressed: capturedImages.isNotEmpty ? _openComparison : null,
+                      tooltip: 'Compare Images',
                     ),
                     // Test audio button
                     IconButton(

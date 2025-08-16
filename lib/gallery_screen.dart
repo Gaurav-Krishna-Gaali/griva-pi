@@ -4,6 +4,7 @@ import 'dart:io';
 import 'services/pdf_service.dart';
 import 'image_edit_screen.dart';
 import 'screens/patient_selection_screen.dart';
+import 'screens/image_comparison_screen.dart';
 import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
 
@@ -98,9 +99,24 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   void _compareSelectedImages() {
-    // TODO: Implement compare functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Compare functionality coming soon')),
+    if (_selectedIndices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one image to compare')),
+      );
+      return;
+    }
+    
+    final selectedImages = _selectedIndices.map((index) => _images[index]).toList();
+    final currentImage = selectedImages.first; // Use first selected as current
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageComparisonScreen(
+          images: selectedImages,
+          currentImage: currentImage,
+        ),
+      ),
     );
   }
 
