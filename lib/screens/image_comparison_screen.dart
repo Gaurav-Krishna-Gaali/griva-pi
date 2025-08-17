@@ -402,119 +402,182 @@ class _ImageComparisonScreenState extends State<ImageComparisonScreen> {
     );
   }
   
-  void _tagImage(int slotIndex) {
-    if (_comparisonImages[slotIndex] == null) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) {
-        String? selectedTag = _imageTags[slotIndex];
-        String customTag = _imageCustomTags[slotIndex] ?? '';
-        
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return AlertDialog(
-              title: const Text('Tag Image'),
-              content: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.8,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Image preview
-                    Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(
-                          _comparisonImages[slotIndex]!,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Tag dropdown
-                    DropdownButtonFormField<String>(
-                      value: selectedTag,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags:',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                      hint: const Text('Select a tag from the dropdown'),
-                      items: _availableTags.map((tag) {
-                        return DropdownMenuItem(
-                          value: tag,
-                          child: Text(tag),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setModalState(() {
-                          selectedTag = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Custom tag field
-                    TextFormField(
-                      initialValue: customTag,
-                      decoration: const InputDecoration(
-                        labelText: 'If Others, Specify',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        customTag = value;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (selectedTag != null) {
-                      setState(() {
-                        _imageTags[slotIndex] = selectedTag!;
-                        if (customTag.isNotEmpty) {
-                          _imageCustomTags[slotIndex] = customTag;
-                        } else {
-                          _imageCustomTags.remove(slotIndex);
-                        }
-                      });
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Image tagged successfully')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select a tag')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6B46C1),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Save Tag'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+        void _tagImage(int slotIndex) {
+     if (_comparisonImages[slotIndex] == null) return;
+     
+     // Show dropdown menu positioned below the tag button
+     final RenderBox button = context.findRenderObject() as RenderBox;
+     final RenderBox overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+     final RelativeRect position = RelativeRect.fromRect(
+       Rect.fromPoints(
+         button.localToGlobal(Offset.zero, ancestor: overlay),
+         button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
+       ),
+       Offset.zero & overlay.size,
+     );
+     
+     showMenu(
+       context: context,
+       position: position,
+       items: [
+         // Tag selection items
+         ..._availableTags.map((tag) => PopupMenuItem<String>(
+           value: tag,
+           child: Row(
+             children: [
+               Icon(
+                 Icons.label,
+                 color: const Color(0xFF6B46C1),
+                 size: 18,
+               ),
+               const SizedBox(width: 12),
+               Expanded(
+                 child: Text(
+                   tag,
+                   style: const TextStyle(
+                     fontSize: 14,
+                     fontWeight: FontWeight.w500,
+                   ),
+                 ),
+               ),
+               if (_imageTags[slotIndex] == tag)
+                 Icon(
+                   Icons.check_circle,
+                   color: const Color(0xFF6B46C1),
+                   size: 18,
+                 ),
+             ],
+           ),
+         )),
+         
+         // Divider
+         const PopupMenuItem<String>(
+           enabled: false,
+           child: Divider(height: 1),
+         ),
+         
+         // Custom tag option
+         PopupMenuItem<String>(
+           value: 'custom',
+           child: Row(
+             children: [
+               Icon(
+                 Icons.edit,
+                 color: const Color(0xFF6B46C1),
+                 size: 18,
+               ),
+               const SizedBox(width: 12),
+               const Text(
+                 'Custom Tag',
+                 style: TextStyle(
+                   fontSize: 14,
+                   fontWeight: FontWeight.w500,
+                 ),
+               ),
+             ],
+           ),
+         ),
+         
+         // Remove tag option (only if tag exists)
+         if (_imageTags.containsKey(slotIndex))
+           PopupMenuItem<String>(
+             value: 'remove',
+             child: Row(
+               children: [
+                 Icon(
+                   Icons.remove_circle_outline,
+                   color: Colors.red[600],
+                   size: 18,
+                 ),
+                 const SizedBox(width: 12),
+                 Text(
+                   'Remove Tag',
+                   style: TextStyle(
+                     fontSize: 14,
+                     fontWeight: FontWeight.w500,
+                     color: Colors.red[600],
+                   ),
+                 ),
+               ],
+             ),
+           ),
+       ],
+     ).then((selectedValue) {
+       if (selectedValue == null) return;
+       
+       if (selectedValue == 'custom') {
+         _showCustomTagDialog(slotIndex);
+       } else if (selectedValue == 'remove') {
+         setState(() {
+           _imageTags.remove(slotIndex);
+           _imageCustomTags.remove(slotIndex);
+         });
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Tag removed')),
+         );
+       } else {
+         setState(() {
+           _imageTags[slotIndex] = selectedValue;
+         });
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Tagged as: $selectedValue')),
+         );
+       }
+     });
+   }
+   
+   void _showCustomTagDialog(int slotIndex) {
+     String customTag = _imageCustomTags[slotIndex] ?? '';
+     
+     showDialog(
+       context: context,
+       builder: (context) {
+         return AlertDialog(
+           title: const Text('Add Custom Tag'),
+           content: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               TextFormField(
+                 initialValue: customTag,
+                 decoration: const InputDecoration(
+                   labelText: 'Custom Tag',
+                   border: OutlineInputBorder(),
+                   hintText: 'Enter your custom tag',
+                 ),
+                 onChanged: (value) {
+                   customTag = value;
+                 },
+               ),
+             ],
+           ),
+           actions: [
+             TextButton(
+               onPressed: () => Navigator.pop(context),
+               child: const Text('Cancel'),
+             ),
+             ElevatedButton(
+               onPressed: () {
+                 if (customTag.trim().isNotEmpty) {
+                   setState(() {
+                     _imageCustomTags[slotIndex] = customTag.trim();
+                   });
+                   Navigator.pop(context);
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     SnackBar(content: Text('Custom tag added: $customTag')),
+                   );
+                 }
+               },
+               style: ElevatedButton.styleFrom(
+                 backgroundColor: const Color(0xFF6B46C1),
+                 foregroundColor: Colors.white,
+               ),
+               child: const Text('Add Tag'),
+             ),
+           ],
+         );
+       },
+     );
+   }
 
   @override
   Widget build(BuildContext context) {
@@ -1006,51 +1069,99 @@ class _ImageComparisonScreenState extends State<ImageComparisonScreen> {
                 ),
               ),
             
-            // Display current tags at the bottom
-            if (hasImage && _imageTags.containsKey(slotIndex))
-              Positioned(
-                bottom: 12,
-                left: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _imageTags[slotIndex]!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (_imageCustomTags.containsKey(slotIndex) && 
-                          _imageCustomTags[slotIndex]!.isNotEmpty)
-                        Text(
-                          _imageCustomTags[slotIndex]!,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+                         // Display current tags at the bottom
+             if (hasImage && _imageTags.containsKey(slotIndex))
+               Positioned(
+                 bottom: 16,
+                 left: 16,
+                 right: 16,
+                 child: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                   decoration: BoxDecoration(
+                     gradient: LinearGradient(
+                       begin: Alignment.topLeft,
+                       end: Alignment.bottomRight,
+                       colors: [
+                         const Color(0xFF6B46C1).withOpacity(0.95),
+                         const Color(0xFF553C9A).withOpacity(0.95),
+                       ],
+                     ),
+                     borderRadius: BorderRadius.circular(16),
+                     border: Border.all(
+                       color: Colors.white.withOpacity(0.3),
+                       width: 1,
+                     ),
+                     boxShadow: [
+                       BoxShadow(
+                         color: const Color(0xFF6B46C1).withOpacity(0.4),
+                         blurRadius: 12,
+                         offset: const Offset(0, 4),
+                         spreadRadius: 2,
+                       ),
+                     ],
+                   ),
+                   child: Row(
+                     children: [
+                       Container(
+                         padding: const EdgeInsets.all(6),
+                         decoration: BoxDecoration(
+                           color: Colors.white.withOpacity(0.2),
+                           borderRadius: BorderRadius.circular(8),
+                         ),
+                         child: Icon(
+                           Icons.label,
+                           color: Colors.white,
+                           size: 16,
+                         ),
+                       ),
+                       const SizedBox(width: 10),
+                       Expanded(
+                         child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             Text(
+                               _imageTags[slotIndex]!,
+                               style: const TextStyle(
+                                 color: Colors.white,
+                                 fontSize: 13,
+                                 fontWeight: FontWeight.w600,
+                                 letterSpacing: 0.5,
+                               ),
+                             ),
+                             if (_imageCustomTags.containsKey(slotIndex) && 
+                                 _imageCustomTags[slotIndex]!.isNotEmpty)
+                               Text(
+                                 _imageCustomTags[slotIndex]!,
+                                 style: TextStyle(
+                                   color: Colors.white.withOpacity(0.9),
+                                   fontSize: 11,
+                                   fontStyle: FontStyle.italic,
+                                   letterSpacing: 0.3,
+                                 ),
+                               ),
+                           ],
+                         ),
+                       ),
+                       Container(
+                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                         decoration: BoxDecoration(
+                           color: Colors.white.withOpacity(0.2),
+                           borderRadius: BorderRadius.circular(12),
+                         ),
+                         child: Text(
+                           'Tagged',
+                           style: TextStyle(
+                             color: Colors.white.withOpacity(0.9),
+                             fontSize: 10,
+                             fontWeight: FontWeight.w500,
+                           ),
+                         ),
+                       ),
+                     ],
+                   ),
+                 ),
+               ),
           ],
         ),
       ),
