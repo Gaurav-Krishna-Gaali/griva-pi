@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:io';
 import '../custom_app_bar.dart';
 import '../custom_drawer.dart';
+import '../widgets/centralized_footer.dart';
 
 class ImageComparisonScreen extends StatefulWidget {
   final List<Uint8List> images;
@@ -730,19 +731,8 @@ class _ImageComparisonScreenState extends State<ImageComparisonScreen> {
 
 
 
-          // Footer with copyright
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: const Text(
-              '© 2025 Griva. All rights reserved.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
+                     // Centralized footer
+           const CentralizedFooter(),
         ],
       ),
     );

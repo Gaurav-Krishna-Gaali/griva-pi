@@ -11,6 +11,7 @@ import 'screens/user_profile_screen.dart';
 import 'main.dart';
 import 'login_page.dart';
 import 'connect_colposcope_screen.dart';
+import 'widgets/centralized_footer.dart';
 
 class HomePage extends StatefulWidget {
   final String? userEmail;
@@ -464,7 +465,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
                   );
                 },
               ),
-            )
+            ),
+            // Add centralized footer
+            const CentralizedFooter(),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/centralized_footer.dart';
 
 
 class CustomDrawer extends StatelessWidget {
@@ -72,13 +73,7 @@ class CustomDrawer extends StatelessWidget {
             onTap: onLogout,
           ),
           SizedBox(height: 16),
-          Text(
-            '© 2025 Griva. All rights reserved.',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
+          const CentralizedFooter(),
           SizedBox(height: 16),
         ],
       ),
