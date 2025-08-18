@@ -75,7 +75,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Fixed method to prevent UI shaking
   Future<void> _triggerAutofocus(BuildContext context) async {
-    const autofocusUrl = 'http://127.0.0.1:5000/autofocus';
+    // const autofocusUrl = 'http://127.0.0.1:5000/autofocus';
+      const autofocusUrl = 'http://192.168.100.1:5000/';
+
 
     // Set state first to show visual feedback
     setState(() {
@@ -117,7 +119,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Fixed method to prevent UI shaking
   Future<void> _toggleRecording() async {
-    const recordUrl = 'http://127.0.0.1:5000/record';
+    // const recordUrl = 'http://127.0.0.1:5000/record';
+    const recordUrl = 'http://192.168.100.1:5000/record';
+
 
     setState(() {
       isShutterPressed = true;
@@ -199,7 +203,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add new capture method
   Future<void> _captureImage(BuildContext context) async {
-    const captureUrl = 'http://127.0.0.1:5000/capture';
+    // const captureUrl = 'http://127.0.0.1:5000/capture';
+    const captureUrl = 'http://192.168.100.1:5000/capture';
+
 
     setState(() {
       isShutterPressed = true;
@@ -310,8 +316,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    // const streamUrl = 'http://192.168.100.1:5000/?action=stream';
-    const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    const streamUrl = 'http://192.168.100.1:5000/?action=stream';
+    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
 
     return Scaffold(
       backgroundColor: Colors.black,
