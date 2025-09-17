@@ -34,6 +34,9 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            fontFamily: 'Poppins',
+          ),
           home: GrivaLoginPage(),
           navigatorObservers: [routeObserver],
         );

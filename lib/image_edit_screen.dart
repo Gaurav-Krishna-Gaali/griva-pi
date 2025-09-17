@@ -644,7 +644,7 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 12,
-                fontFamily: 'monospace',
+                // fontFamily: 'monospace',
               ),
             ),
           ],
