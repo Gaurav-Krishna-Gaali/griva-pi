@@ -4,6 +4,7 @@ import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
 import "exam_screen.dart";
 import 'services/patient_service.dart';
+import 'widgets/centralized_footer.dart';
 
 class NewPatientForm extends StatefulWidget {
   const NewPatientForm({Key? key}) : super(key: key);
@@ -168,11 +169,23 @@ class _NewPatientFormState extends State<NewPatientForm> {
     return Scaffold(
       drawer: CustomDrawer(),
       appBar: CustomAppBar(),
-
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
+      backgroundColor: const Color.fromARGB(255,255,254,254),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: const InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+          ),
+        ),
+        child: Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Padding(
+              padding: const EdgeInsets.all(25.0),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Time and Date display
@@ -189,14 +202,14 @@ class _NewPatientFormState extends State<NewPatientForm> {
                             IconButton(
                               icon: const Icon(
                                 Icons.arrow_back,
-                                color: Colors.purple,
+                                color: Color.fromARGB(255,169,84,234),
                               ),
                               onPressed: () => Navigator.of(context).pop(),
                             ),
                             const Text(
                               'New Patient Form',
                               style: TextStyle(
-                                color: Colors.purple,
+                                color: Color.fromARGB(255,169,84,234),
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -233,7 +246,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               // Form Card
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
@@ -558,7 +571,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               // New General Medical History Section in a Card
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -682,7 +695,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -1051,7 +1064,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -1250,7 +1263,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                   ElevatedButton(
                     onPressed: _isSaving ? null : () => _savePatient(goToExam: false),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
+                      backgroundColor: Color.fromARGB(255,169,84,234),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
@@ -1265,7 +1278,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                   ElevatedButton(
                     onPressed: _isSaving ? null : () => _savePatient(goToExam: true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
+                      backgroundColor: Color.fromARGB(255,169,84,234),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
@@ -1282,17 +1295,15 @@ class _NewPatientFormState extends State<NewPatientForm> {
 
               // Footer
               const SizedBox(height: 20),
-              Center(
-                child: Text(
-                  '© 2025 Griya. All rights reserved.',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 20),
+              const CentralizedFooter(),
             ],
           ),
         ),
       ),
+    ),
+    ),
+  ),
+),
     );
   }
 
@@ -1326,7 +1337,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: () => onChanged(value + 1),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.purple,
+                  backgroundColor: Color.fromARGB(255,169,84,234),
                   foregroundColor: Colors.white,
                 ),
               ),

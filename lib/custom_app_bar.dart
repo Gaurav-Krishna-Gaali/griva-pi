@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'connect_colposcope_screen.dart';
-import 'home_page.dart';
+// import 'home_page.dart';
 import 'screens/user_profile_screen.dart';
-import 'main.dart';
+// import 'main.dart';
 import 'login_page.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -30,16 +30,26 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       title: title,
       flexibleSpace: title == null
-          ? Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/images/griva_bg.png',
-                    height: 36,
-                  ),
-                  SizedBox(width: 8),
-                ],
+          ? SizedBox.expand(
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Color(0xFF8B44F7), width: 1.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Image.asset(
+                        'assets/images/griva_bg.png',
+                        height: 36,
+                      ),
+                    ),
+                    // SizedBox(width: 8),
+                  ],
+                ),
               ),
             )
           : null,

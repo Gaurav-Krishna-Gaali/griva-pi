@@ -78,6 +78,7 @@ flutter:
     - assets/images/logo.png
     - assets/images/griva_bg.png
     - assets/images/icons/users.png
+    - assets/images/icons/settings.png
     - assets/audio/
     - assets/fonts/
     - shorebird.yaml
