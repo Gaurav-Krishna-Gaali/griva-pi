@@ -45,7 +45,6 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_screenutil: ^5.9.3
-  # google_fonts: ^6.2.1
   intl: ^0.20.2
   # http: ^1.3.0
   webview_flutter: ^4.13.0
@@ -77,6 +76,8 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/logo.png
+    - assets/images/griva_bg.png
+    - assets/images/icons/users.png
     - assets/audio/
     - assets/fonts/
     - shorebird.yaml

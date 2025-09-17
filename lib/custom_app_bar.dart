@@ -18,6 +18,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
+      centerTitle: true,
+      titleSpacing: 0,
       leading: Builder(
         builder: (context) => IconButton(
           icon: Icon(Icons.menu, color: Colors.purple),
@@ -26,25 +28,21 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           },
         ),
       ),
-      title: title ?? Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/logo.png',
-            height: 36,
-          ),
-          SizedBox(width: 8),
-          Text(
-            'Colposcope',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
+      title: title,
+      flexibleSpace: title == null
+          ? Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/griva_bg.png',
+                    height: 36,
+                  ),
+                  SizedBox(width: 8),
+                ],
+              ),
+            )
+          : null,
       actions: [
         IconButton(
           key: infoIconKey,
