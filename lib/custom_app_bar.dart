@@ -28,31 +28,17 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           },
         ),
       ),
-      title: title,
-      flexibleSpace: title == null
-          ? SizedBox.expand(
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Color(0xFF8B44F7), width: 1.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Image.asset(
-                        'assets/images/griva_bg.png',
-                        height: 36,
-                      ),
-                    ),
-                    // SizedBox(width: 8),
-                  ],
-                ),
-              ),
-            )
-          : null,
+      title: title ?? Container(
+        padding: EdgeInsets.all(4),
+        // decoration: BoxDecoration(
+        //   border: Border.all(color: Color(0xFF8B44F7), width: 1.5),
+        //   borderRadius: BorderRadius.circular(8),
+        // ),
+        child: Image.asset(
+          'assets/images/griva_bg.png',
+          height: 36,
+        ),
+      ),
       actions: [
         IconButton(
           key: infoIconKey,

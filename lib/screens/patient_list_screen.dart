@@ -6,6 +6,8 @@ import 'patient_form_screen.dart';
 import 'dart:io';
 import '../widgets/centralized_footer.dart';
 import '../custom_app_bar.dart';
+import 'patient_details_screen.dart';
+import '../exam_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -561,6 +563,46 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   child: Icon(Icons.photo_library_outlined, size: 64, color: Colors.deepPurple),
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PatientDetailsScreen(patient: p),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.edit, size: 18),
+                  label: const Text('View Details'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B44F7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PiCameraScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.camera_alt, size: 18),
+                  label: const Text('Start Exam'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    side: const BorderSide(color: Color(0xFF8B44F7)),
+                    foregroundColor: const Color(0xFF8B44F7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
