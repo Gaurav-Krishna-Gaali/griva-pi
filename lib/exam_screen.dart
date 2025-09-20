@@ -32,6 +32,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
+  
+  
+  // Cache for unlinked images
+  final List<Map<String, dynamic>> unlinkedImages = []; // {bytes, metadata, timestamp}
 
   // Timer variables
   Timer? _viaTimer;
@@ -172,6 +176,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         builder:
             (context) => GalleryScreen(
               images: capturedImages,
+              unlinkedImages: unlinkedImages,
               onDelete: (index) {
                 setState(() {
                   capturedImages.removeAt(index);
@@ -261,7 +266,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     // const captureUrl = 'http://127.0.0.1:5000/capture';
     const captureUrl = 'http://192.168.1.54:5000/capture';
 
-
     setState(() {
       isShutterPressed = true;
       showFlash = true;
@@ -282,6 +286,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
           capturedImageBytes = response.bodyBytes;
           capturedImages.add(response.bodyBytes);
         });
+
+        // Store image in cache with metadata
+        await _cacheImage(response.bodyBytes);
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Failed to capture image: ${response.body}")),
@@ -301,6 +308,37 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       }
     }
   }
+
+  // Cache image temporarily
+  Future<void> _cacheImage(Uint8List imageBytes) async {
+    try {
+      // Create metadata for the image
+      final metadata = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'led_stage': (brightnessLevel * 5).round(),
+        'green_filter_level': (greenFilterLevel * 5).round(),
+        'zoom_level': zoomLevel,
+        'capture_settings': {
+          'brightness': brightnessLevel,
+          'green_filter': greenFilterLevel,
+          'zoom': zoomLevel,
+        }
+      };
+
+      // Add to unlinked images cache
+      unlinkedImages.add({
+        'bytes': imageBytes,
+        'metadata': metadata,
+        'timestamp': DateTime.now(),
+      });
+
+      print('Image cached successfully. Total unlinked images: ${unlinkedImages.length}');
+    } catch (e) {
+      print('Error caching image: $e');
+    }
+  }
+
+
 
 
   // Start or stop VIA timer
@@ -440,6 +478,48 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     //   onPressed: isControlsDisabled ? null : _toggleLED,
                     //   tooltip: 'LED Light',
                     // ),
+                    // Unlinked images indicator
+                    if (unlinkedImages.isNotEmpty)
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.image, color: Colors.orange),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${unlinkedImages.length} images ready to link in gallery'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            tooltip: '${unlinkedImages.length} unlinked images',
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                '${unlinkedImages.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     // LED brightness control button (flash icon)
                     IconButton(
                       icon: Icon(

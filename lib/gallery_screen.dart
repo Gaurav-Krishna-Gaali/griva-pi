@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'dart:io';
 import 'services/pdf_service.dart';
+import 'services/patient_service.dart';
+import 'services/image_service.dart';
 import 'image_edit_screen.dart';
 import 'screens/patient_selection_screen.dart';
 import 'screens/image_comparison_screen.dart';
@@ -11,11 +13,13 @@ import 'custom_drawer.dart';
 class GalleryScreen extends StatefulWidget {
   final List<Uint8List> images;
   final Function(int) onDelete;
+  final List<Map<String, dynamic>>? unlinkedImages; // Cached images with metadata
 
   const GalleryScreen({
     Key? key,
     required this.images,
     required this.onDelete,
+    this.unlinkedImages,
   }) : super(key: key);
 
   @override
@@ -26,11 +30,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
   late List<Uint8List> _images;
   Set<int> _selectedIndices = {};
   bool _isSelectionMode = false;
+  final PatientService _patientService = PatientService();
+  List<Map<String, dynamic>> _unlinkedImages = [];
 
   @override
   void initState() {
     super.initState();
     _images = List.from(widget.images);
+    _unlinkedImages = List.from(widget.unlinkedImages ?? []);
   }
 
   @override
@@ -139,6 +146,111 @@ class _GalleryScreenState extends State<GalleryScreen> {
         _selectedIndices.clear();
       });
     });
+  }
+
+  // Link unlinked images to a patient
+  Future<void> _linkImagesToPatient() async {
+    if (_unlinkedImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No unlinked images to save')),
+      );
+      return;
+    }
+
+    try {
+      final patients = await _patientService.getAllPatients();
+      
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Link ${_unlinkedImages.length} Images to Patient'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 300,
+                child: ListView.builder(
+                  itemCount: patients.length,
+                  itemBuilder: (context, index) {
+                    final patient = patients[index];
+                    return ListTile(
+                      title: Text(patient.patientName),
+                      subtitle: Text('ID: ${patient.patientId ?? 'N/A'}'),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        await _saveUnlinkedImagesToPatient(patient);
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      print('Error loading patients: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error loading patients: $e")),
+        );
+      }
+    }
+  }
+
+  // Save unlinked images to selected patient
+  Future<void> _saveUnlinkedImagesToPatient(Patient patient) async {
+    try {
+      for (final imageData in _unlinkedImages) {
+        final imageBytes = imageData['bytes'] as Uint8List;
+        final metadata = imageData['metadata'] as Map<String, dynamic>;
+
+        // Save image to device storage
+        final imagePath = await ImageService.saveExaminationImage(
+          imageBytes, 
+          patient.id!, 
+          metadata
+        );
+
+        // Add image path to patient database
+        await _patientService.addExaminationImage(
+          patient.id!, 
+          imagePath, 
+          metadata
+        );
+      }
+
+      final savedCount = _unlinkedImages.length;
+      
+      // Clear unlinked images after successful save
+      setState(() {
+        _unlinkedImages.clear();
+      });
+      
+      print('All unlinked images saved successfully for patient: ${patient.patientName}');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("$savedCount images linked to ${patient.patientName}"),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error saving unlinked images to patient: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error linking images: $e")),
+        );
+      }
+    }
   }
 
   Future<void> _showPdfOptions() async {
@@ -479,25 +591,65 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   // Section title and selection count
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Review and edit captured Images',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: Colors.black87,
-                          ),
+                        Row(
+                          children: [
+                            const Text(
+                              'Review and edit captured Images',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${_selectedIndices.length}/${_images.length} Selected for Report',
+                              style: const TextStyle(
+                                color: Color(0xFF6B46C1), // Purple color
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '${_selectedIndices.length}/${_images.length} Selected for Report',
-                          style: const TextStyle(
-                            color: Color(0xFF6B46C1), // Purple color
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
+                        if (_unlinkedImages.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                                ),
+                                child: Text(
+                                  '${_unlinkedImages.length} unlinked images',
+                                  style: const TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.link, size: 16),
+                                label: const Text('Link to Patient'),
+                                onPressed: _linkImagesToPatient,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  minimumSize: const Size(0, 28),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

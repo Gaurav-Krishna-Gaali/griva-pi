@@ -33,6 +33,7 @@ dependencies:
   sqflite: ^2.3.3
   sqflite_common_ffi: ^2.3.3
   path: ^1.9.0
+  path_provider: ^2.1.1
   audioplayers: ^6.0.0
   pdf: ^3.11.3
   printing: ^5.14.2
@@ -49,7 +50,6 @@ dependencies:
   # http: ^1.3.0
   webview_flutter: ^4.13.0
   flutter_mjpeg: ^2.0.4
-  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +79,7 @@ flutter:
     - assets/images/griva_bg.png
     - assets/images/icons/users.png
     - assets/images/icons/settings.png
+    - assets/images/launch_gif.gif
     - assets/audio/
     - assets/fonts/
     - shorebird.yaml

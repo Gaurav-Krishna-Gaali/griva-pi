@@ -3,8 +3,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:io' show Platform;
 import 'package:sqflite/sqflite.dart';
-import 'screens/patient_list_screen.dart';
 import 'login_page.dart';
+import 'launch_screen.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -36,10 +36,40 @@ class MyApp extends StatelessWidget {
           theme: ThemeData(
             fontFamily: 'Poppins',
           ),
-          home: GrivaLoginPage(),
+          home: const SplashScreen(),
           navigatorObservers: [routeObserver],
         );
       },
     );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _navigateToLogin();
+  }
+
+  _navigateToLogin() async {
+    await Future.delayed(const Duration(seconds: 3), () {});
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const GrivaLoginPage()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const LaunchScreen();
   }
 }

@@ -56,6 +56,10 @@ class Patient {
   // Forensic Examination Fields - stored as a JSON string in DB
   final Map<String, String>? forensicExamination;
 
+  // Examination Images - stored as JSON array of image paths
+  final List<String>? examinationImages; // Paths to captured examination images
+  final Map<String, dynamic>? imageMetadata; // Image capture metadata (timestamp, settings, etc.)
+
   Patient({
     this.id,
     required this.patientName,
@@ -104,6 +108,8 @@ class Patient {
     this.precautions,
     this.examiningPhysician,
     this.forensicExamination,
+    this.examinationImages,
+    this.imageMetadata,
   });
 
   Map<String, dynamic> toMap() {
@@ -155,6 +161,8 @@ class Patient {
       'precautions': precautions,
       'examining_physician': examiningPhysician,
       'forensic_examination': forensicExamination != null ? jsonEncode(forensicExamination) : null,
+      'examination_images': examinationImages != null ? jsonEncode(examinationImages) : null,
+      'image_metadata': imageMetadata != null ? jsonEncode(imageMetadata) : null,
     };
   }
 
@@ -178,6 +186,32 @@ class Patient {
         final decoded = jsonDecode(json);
         if (decoded is Map) {
           return decoded.map((key, value) => MapEntry(key.toString(), value.toString()));
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    List<String>? decodeExaminationImages(String? json) {
+      if (json == null) return null;
+      try {
+        final decoded = jsonDecode(json);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList();
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    Map<String, dynamic>? decodeImageMetadata(String? json) {
+      if (json == null) return null;
+      try {
+        final decoded = jsonDecode(json);
+        if (decoded is Map) {
+          return decoded.map((key, value) => MapEntry(key.toString(), value));
         }
         return null;
       } catch (e) {
@@ -233,6 +267,8 @@ class Patient {
       precautions: map['precautions'],
       examiningPhysician: map['examining_physician'],
       forensicExamination: decodeForensic(map['forensic_examination']),
+      examinationImages: decodeExaminationImages(map['examination_images']),
+      imageMetadata: decodeImageMetadata(map['image_metadata']),
     );
   }
 }
@@ -268,7 +304,7 @@ class PatientService {
       
       return await openDatabase(
         path,
-        version: 2, // Updated to version 2 to include users table
+        version: 3, // Updated to version 3 to include examination images
         onCreate: (Database db, int version) async {
           print('Creating new database...'); // Debug log
           await db.execute('''
@@ -319,7 +355,9 @@ class PatientService {
               treatment_provided TEXT,
               precautions TEXT,
               examining_physician TEXT,
-              forensic_examination TEXT
+              forensic_examination TEXT,
+              examination_images TEXT,
+              image_metadata TEXT
             )
           ''');
           
@@ -411,6 +449,13 @@ class PatientService {
             }
             
             print('Users table created and admin user inserted');
+          }
+          
+          if (oldVersion < 3) {
+            // Add examination images columns
+            await db.execute('ALTER TABLE $tableName ADD COLUMN examination_images TEXT');
+            await db.execute('ALTER TABLE $tableName ADD COLUMN image_metadata TEXT');
+            print('Examination images columns added');
           }
         },
         onOpen: (db) {
@@ -544,5 +589,82 @@ class PatientService {
       tableName,
       where: '1 = 1',
     );
+  }
+
+  // Add examination image to patient
+  Future<void> addExaminationImage(int patientId, String imagePath, Map<String, dynamic>? metadata) async {
+    final db = await database;
+    final patient = await getPatientById(patientId);
+    if (patient == null) return;
+
+    final currentImages = patient.examinationImages ?? [];
+    final currentMetadata = patient.imageMetadata ?? {};
+    
+    // Add new image path
+    currentImages.add(imagePath);
+    
+    // Add metadata for this image
+    if (metadata != null) {
+      currentMetadata[imagePath] = metadata;
+    }
+
+    await db.update(
+      tableName,
+      {
+        'examination_images': jsonEncode(currentImages),
+        'image_metadata': jsonEncode(currentMetadata),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
+  }
+
+  // Remove examination image from patient
+  Future<void> removeExaminationImage(int patientId, String imagePath) async {
+    final db = await database;
+    final patient = await getPatientById(patientId);
+    if (patient == null) return;
+
+    final currentImages = patient.examinationImages ?? [];
+    final currentMetadata = patient.imageMetadata ?? {};
+    
+    // Remove image path
+    currentImages.remove(imagePath);
+    
+    // Remove metadata for this image
+    currentMetadata.remove(imagePath);
+
+    await db.update(
+      tableName,
+      {
+        'examination_images': jsonEncode(currentImages),
+        'image_metadata': jsonEncode(currentMetadata),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
+  }
+
+  // Get all examination images for a patient
+  Future<List<String>> getExaminationImages(int patientId) async {
+    final patient = await getPatientById(patientId);
+    return patient?.examinationImages ?? [];
+  }
+
+  // Get patient by ID
+  Future<Patient?> getPatientById(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Patient.fromMap(maps.first);
+    }
+    return null;
   }
 } 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import '../custom_app_bar.dart';
 import '../widgets/centralized_footer.dart';
 import '../services/patient_service.dart';
+import '../services/image_service.dart';
 import '../new_patient_form.dart';
 
 class PatientDetailsScreen extends StatefulWidget {
@@ -16,11 +18,29 @@ class PatientDetailsScreen extends StatefulWidget {
 class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   final PatientService _patientService = PatientService();
   late Patient _patient;
+  List<String> _examinationImages = [];
+  bool _isLoadingImages = true;
 
   @override
   void initState() {
     super.initState();
     _patient = widget.patient;
+    _loadExaminationImages();
+  }
+
+  Future<void> _loadExaminationImages() async {
+    try {
+      final images = await ImageService.getPatientImages(_patient.id!);
+      setState(() {
+        _examinationImages = images;
+        _isLoadingImages = false;
+      });
+    } catch (e) {
+      print('Error loading examination images: $e');
+      setState(() {
+        _isLoadingImages = false;
+      });
+    }
   }
   @override
   Widget build(BuildContext context) {
@@ -226,7 +246,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  // Clinical Notes
+                  // Examination Images
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(20),
@@ -247,22 +267,29 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.description, color: Color(0xFF8B44F7), size: 20),
+                              const Icon(Icons.photo_camera, color: Color(0xFF8B44F7), size: 20),
                               const SizedBox(width: 8),
                               const Text(
-                                'Clinical Notes',
+                                'Examination Images',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF1F2937),
                                 ),
                               ),
+                              const Spacer(),
+                              Text(
+                                '${_examinationImages.length}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF8B44F7),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _buildClinicalNote('15/01/2024', 'Regular cervical screening performed. Normal cytology results. Patient advised to continue regular screenings.'),
-                          const SizedBox(height: 12),
-                          _buildClinicalNote('10/12/2023', 'Follow-up consultation. Patient reports no unusual symptoms. Discussed preventive care measures.'),
+                          _buildExaminationImagesGrid(),
                         ],
                       ),
                     ),
@@ -655,5 +682,215 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Widget _buildExaminationImagesGrid() {
+    if (_isLoadingImages) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B44F7)),
+        ),
+      );
+    }
+
+    if (_examinationImages.isEmpty) {
+      return Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.grey.withOpacity(0.3),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_camera_outlined,
+                size: 32,
+                color: Colors.grey,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No examination images',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 200,
+      child: GridView.builder(
+        scrollDirection: Axis.horizontal,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 1,
+          childAspectRatio: 1.0,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: _examinationImages.length,
+        itemBuilder: (context, index) {
+          return _buildImageThumbnail(_examinationImages[index], index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildImageThumbnail(String imagePath, int index) {
+    return GestureDetector(
+      onTap: () => _showImageDialog(imagePath, index),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: const Color(0xFF8B44F7).withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: FutureBuilder<Uint8List?>(
+            future: ImageService.loadImage(imagePath),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B44F7)),
+                    strokeWidth: 2,
+                  ),
+                );
+              }
+              
+              if (snapshot.hasError || snapshot.data == null) {
+                return Container(
+                  color: Colors.grey.withOpacity(0.1),
+                  child: const Icon(
+                    Icons.broken_image,
+                    color: Colors.grey,
+                    size: 32,
+                  ),
+                );
+              }
+
+              return Image.memory(
+                snapshot.data!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showImageDialog(String imagePath, int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Stack(
+            children: [
+              Center(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.9,
+                    maxHeight: MediaQuery.of(context).size.height * 0.8,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: FutureBuilder<Uint8List?>(
+                      future: ImageService.loadImage(imagePath),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B44F7)),
+                            ),
+                          );
+                        }
+                        
+                        if (snapshot.hasError || snapshot.data == null) {
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text('Failed to load image'),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 3.0,
+                          child: Image.memory(
+                            snapshot.data!,
+                            fit: BoxFit.contain,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withOpacity(0.5),
+                    shape: const CircleBorder(),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Image ${index + 1} of ${_examinationImages.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
