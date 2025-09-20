@@ -3,6 +3,7 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/patient_service.dart';
 import 'patient_form_screen.dart';
+import '../new_patient_form.dart';
 import 'dart:io';
 import '../widgets/centralized_footer.dart';
 import '../custom_app_bar.dart';
@@ -57,7 +58,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const PatientFormScreen(),
+        builder: (context) => const NewPatientForm(),
       ),
     );
     if (result == true) {
@@ -568,13 +569,17 @@ class _PatientListScreenState extends State<PatientListScreen> {
             Row(
               children: [
                 ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    final changed = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => PatientDetailsScreen(patient: p),
                       ),
                     );
+                    if (changed == true) {
+                      setState(() { _selectedPatient = null; });
+                      _loadPatients();
+                    }
                   },
                   icon: const Icon(Icons.edit, size: 18),
                   label: const Text('View Details'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../custom_app_bar.dart';
 import '../widgets/centralized_footer.dart';
 import '../services/patient_service.dart';
+import '../new_patient_form.dart';
 
 class PatientDetailsScreen extends StatefulWidget {
   final Patient patient;
@@ -13,6 +14,14 @@ class PatientDetailsScreen extends StatefulWidget {
 }
 
 class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
+  final PatientService _patientService = PatientService();
+  late Patient _patient;
+
+  @override
+  void initState() {
+    super.initState();
+    _patient = widget.patient;
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -64,7 +73,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                              const Icon(Icons.person, color: Color(0xFF8B44F7), size: 24),
                              const SizedBox(width: 12),
                              Text(
-                               widget.patient.patientName,
+                              _patient.patientName,
                                style: const TextStyle(
                                  fontSize: 20,
                                  fontWeight: FontWeight.bold,
@@ -73,10 +82,43 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                              ),
                            ],
                          ),
-                         IconButton(
-                           icon: const Icon(Icons.more_vert, color: Colors.grey),
-                           onPressed: () {},
-                         ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, color: Colors.grey),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          offset: const Offset(0, 36), color: Colors.white,
+                          onSelected: (value) {
+                            switch (value) {
+                              case 'edit':
+                                _navigateToEdit();
+                                break;
+                              case 'delete':
+                                _confirmAndDelete();
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.edit, size: 18, color: Colors.grey),
+                                  SizedBox(width: 12),
+                                  Text('Edit', style: TextStyle(color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.delete, size: 18, color: Colors.red),
+                                  SizedBox(width: 12),
+                                  Text('Delete', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                        ],
                      ),
                      const SizedBox(height: 20),
@@ -90,9 +132,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                             runSpacing: 8,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              _buildInlineInfo(Icons.medication_outlined, 'Patient ID', widget.patient.patientId ?? 'N/A'),
+                              _buildInlineInfo(Icons.medication_outlined, 'Patient ID', _patient.patientId ?? 'N/A'),
                               _buildInlineInfo(Icons.person_outline, 'Age', _calculateAge()),
-                              _buildInlineInfo(Icons.calendar_today_outlined, 'DOB', _formatDate(widget.patient.dateOfBirth)),
+                              _buildInlineInfo(Icons.calendar_today_outlined, 'DOB', _formatDate(_patient.dateOfBirth)),
                             ],
                           ),
                         ),
@@ -101,9 +143,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                            child: Wrap(
                             spacing: 16, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center,
                              children: [
-                               _buildInlineInfo(Icons.phone, '', widget.patient.mobileNo ?? 'N/A'),
-                               _buildInlineInfo(Icons.email, '', widget.patient.email ?? 'N/A'),
-                               _buildInlineInfo(Icons.location_on, '', widget.patient.address ?? 'N/A'),
+                               _buildInlineInfo(Icons.phone, '', _patient.mobileNo),
+                               _buildInlineInfo(Icons.email, '', _patient.email ?? 'N/A'),
+                               _buildInlineInfo(Icons.location_on, '', _patient.address ?? 'N/A'),
                              ],
                            ),
                          ),
@@ -176,7 +218,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                           const SizedBox(height: 12),
                           _buildHealthInfo('Total Visits', '2'),
                           const SizedBox(height: 12),
-                          _buildHealthInfo('Latest Visit', _formatDate(widget.patient.dateOfVisit)),
+                          _buildHealthInfo('Latest Visit', _formatDate(_patient.dateOfVisit)),
                           const SizedBox(height: 12),
                           _buildHealthInfo('Next Follow-up', '05/08/2025'),
                         ],
@@ -358,6 +400,78 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     );
   }
 
+  Future<void> _navigateToEdit() async {
+    try {
+      Patient? patientToEdit = widget.patient;
+      if (widget.patient.id != null) {
+        // Fetch the latest data from the SQL DB using the primary key
+        patientToEdit = await _patientService.getPatient(widget.patient.id!);
+      }
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NewPatientForm(patient: patientToEdit),
+        ),
+      );
+      if (result == true) {
+        if (_patient.id != null) {
+          final refreshed = await _patientService.getPatient(_patient.id!);
+          if (mounted) setState(() { _patient = refreshed; });
+        } else if (mounted) {
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load patient: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmAndDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Patient'),
+        content: Text('Are you sure you want to delete ${widget.patient.patientName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        if (widget.patient.id != null) {
+          await _patientService.deletePatient(widget.patient.id!);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Patient deleted')),
+          );
+          Navigator.pop(context, true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Widget _dot() => Container(
         width: 4,
         height: 4,
@@ -528,9 +642,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   }
 
   String _calculateAge() {
-    if (widget.patient.dateOfBirth == null) return 'N/A';
+    if (_patient.dateOfBirth == null) return 'N/A';
     final now = DateTime.now();
-    final birthDate = widget.patient.dateOfBirth!;
+    final birthDate = _patient.dateOfBirth!;
     int age = now.year - birthDate.year;
     if (now.month < birthDate.month || (now.month == birthDate.month && now.day < birthDate.day)) {
       age--;
