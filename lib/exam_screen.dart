@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
@@ -16,15 +15,27 @@ class PiCameraScreen extends StatefulWidget {
 
 class _PiCameraScreenState extends State<PiCameraScreen>
     with SingleTickerProviderStateMixin {
-  bool isRecording = false;
-  bool isPhoto = true; // Toggle between photo and video mode
   bool isShutterPressed = false;
   bool isGreenFilterActive = false;
   bool showFlash = false;
   Uint8List? capturedImageBytes;
+  
+  // New control states
+  bool isFlashlightOn = false;
+  bool isBrightnessControlVisible = false;
+  bool isGreenFilterControlVisible = false;
+  bool isZoomControlVisible = false;
+  bool isControlsDisabled = false;
+  double brightnessLevel = 0.0; // 0.0 to 1.0 (maps to LED stages 0-5)
+  double greenFilterLevel = 0.0; // 0.0 to 1.0 (maps to green filter levels 0-5)
+  double zoomLevel = 1.0; // 1.0 to 5.0
 
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
+  
+  
+  // Cache for unlinked images
+  final List<Map<String, dynamic>> unlinkedImages = []; // {bytes, metadata, timestamp}
 
   // Timer variables
   Timer? _viaTimer;
@@ -62,6 +73,26 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         }
       }
     });
+
+    // Initialize LED to stage 0
+    _initializeLED();
+  }
+
+  // Initialize LED to stage 0
+  Future<void> _initializeLED() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.54:5000/led?stage=0'),
+      );
+      
+      if (response.statusCode == 200) {
+        print('LED initialized to stage 0');
+      } else {
+        print('Failed to initialize LED: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error initializing LED: $e');
+    }
   }
 
   @override
@@ -69,95 +100,73 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     _flashAnimationController.dispose();
     _viaTimer?.cancel();
     _audioPlayer.dispose();
+    // Turn off LED when screen is disposed
+    _turnOffLED();
     super.dispose();
   }
 
-  // Fixed method to prevent UI shaking
-  Future<void> _triggerAutofocus(BuildContext context) async {
-    const autofocusUrl = 'http://127.0.0.1:5000/autofocus';
-
-    // Set state first to show visual feedback
-    setState(() {
-      isShutterPressed = true;
-      showFlash = true;
-    });
-
-    // Reset and start the animation
-    if (mounted) {
-      _flashAnimationController.reset();
-      _flashAnimationController.forward();
-    }
-
-    // Small delay to show button press animation
-    await Future.delayed(const Duration(milliseconds: 150));
-
+  // Turn off LED
+  Future<void> _turnOffLED() async {
     try {
-      final response = await http.post(Uri.parse(autofocusUrl));
-      if (response.statusCode != 200 && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to autofocus: ${response.body}")),
-        );
-      }
+      await http.post(
+        Uri.parse('http://192.168.1.54:5000/led?stage=0'),
+      );
+      print('LED turned off');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    } finally {
-      // Ensure we reset the button state
-      if (mounted) {
-        setState(() {
-          isShutterPressed = false;
-        });
-      }
+      print('Error turning off LED: $e');
     }
   }
 
-  // Fixed method to prevent UI shaking
-  Future<void> _toggleRecording() async {
-    const recordUrl = 'http://127.0.0.1:5000/record';
 
+
+  // Green filter control (slider for fine control)
+  void _toggleGreenFilterControl() {
     setState(() {
-      isShutterPressed = true;
+      isGreenFilterControlVisible = !isGreenFilterControlVisible;
+      if (isGreenFilterControlVisible) {
+        isBrightnessControlVisible = false; // Close brightness if open
+        isZoomControlVisible = false; // Close zoom if open
+      }
     });
+  }
 
-    // Small delay to show button press animation
-    await Future.delayed(const Duration(milliseconds: 150));
+  // Update green filter level and control API
+  Future<void> _updateGreenFilter(double value) async {
+    setState(() {
+      greenFilterLevel = value;
+    });
+    
+    // Map green filter level (0.0-1.0) to levels (0-5)
+    int filterLevel = (value * 5).round();
+    
+    await _setGreenFilterLevel(filterLevel);
+  }
 
+  // Set green filter level
+  Future<void> _setGreenFilterLevel(int level) async {
     try {
       final response = await http.post(
-        Uri.parse(recordUrl),
-        body: {'action': isRecording ? 'stop' : 'start'},
+        Uri.parse('http://192.168.1.54:5000/green?level=$level'),
       );
-
-      if (response.statusCode == 200 && mounted) {
-        setState(() {
-          isRecording = !isRecording;
-        });
+      
+      if (response.statusCode == 200) {
+        print('Green filter level set to $level successfully');
+      } else {
+        print('Failed to set green filter level: ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Green filter control failed: ${response.body}")),
+          );
+        }
       }
     } catch (e) {
+      print('Error controlling green filter: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Recording error: $e")));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isShutterPressed = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Green filter error: $e")),
+        );
       }
     }
-  }
-
-  void _toggleGreenFilter() {
-    setState(() {
-      isGreenFilterActive = !isGreenFilterActive;
-    });
-
-    // Feedback without SnackBar to prevent shaking
-    // You could implement a custom overlay here instead
   }
 
   void _openGallery() {
@@ -167,6 +176,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         builder:
             (context) => GalleryScreen(
               images: capturedImages,
+              unlinkedImages: unlinkedImages,
               onDelete: (index) {
                 setState(() {
                   capturedImages.removeAt(index);
@@ -177,14 +187,84 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     );
   }
 
-  void _openViaOptions() {
-    // Simple state change without SnackBar
-    // In a real app, you would show a dialog with options
+
+
+
+  // Brightness control (slider for fine LED control)
+  void _toggleBrightnessControl() {
+    setState(() {
+      isBrightnessControlVisible = !isBrightnessControlVisible;
+      if (isBrightnessControlVisible) {
+        isGreenFilterControlVisible = false; // Close green filter if open
+        isZoomControlVisible = false; // Close zoom if open
+      }
+    });
+  }
+
+  // Update brightness level and control LED
+  Future<void> _updateBrightness(double value) async {
+    setState(() {
+      brightnessLevel = value;
+    });
+    
+    // Map brightness level (0.0-1.0) to LED stages (0-5)
+    int ledStage = (value * 5).round();
+    
+    await _setLEDStage(ledStage);
+  }
+
+  // Set LED stage
+  Future<void> _setLEDStage(int stage) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.54:5000/led?stage=$stage'),
+      );
+      
+      if (response.statusCode == 200) {
+        print('LED stage set to $stage successfully');
+      } else {
+        print('Failed to set LED stage: ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("LED control failed: ${response.body}")),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error controlling LED: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("LED error: $e")),
+        );
+      }
+    }
+  }
+
+
+  // Zoom control
+  void _toggleZoomControl() {
+    setState(() {
+      isZoomControlVisible = !isZoomControlVisible;
+      if (isZoomControlVisible) {
+        isBrightnessControlVisible = false; // Close brightness if open
+        isGreenFilterControlVisible = false; // Close green filter if open
+      }
+    });
+  }
+
+
+
+  // Update zoom level
+  void _updateZoom(double value) {
+    setState(() {
+      zoomLevel = value;
+    });
   }
 
   // Add new capture method
   Future<void> _captureImage(BuildContext context) async {
-    const captureUrl = 'http://127.0.0.1:5000/capture';
+    // const captureUrl = 'http://127.0.0.1:5000/capture';
+    const captureUrl = 'http://192.168.1.54:5000/capture';
 
     setState(() {
       isShutterPressed = true;
@@ -206,6 +286,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
           capturedImageBytes = response.bodyBytes;
           capturedImages.add(response.bodyBytes);
         });
+
+        // Store image in cache with metadata
+        await _cacheImage(response.bodyBytes);
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Failed to capture image: ${response.body}")),
@@ -226,16 +309,37 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
   }
 
-  // Test audio playback
-  void _testAudio() async {
+  // Cache image temporarily
+  Future<void> _cacheImage(Uint8List imageBytes) async {
     try {
-      print('Testing audio playback...');
-      await _audioPlayer.play(AssetSource('audio/timer_start.mp3'));
-      print('Test audio played successfully');
+      // Create metadata for the image
+      final metadata = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'led_stage': (brightnessLevel * 5).round(),
+        'green_filter_level': (greenFilterLevel * 5).round(),
+        'zoom_level': zoomLevel,
+        'capture_settings': {
+          'brightness': brightnessLevel,
+          'green_filter': greenFilterLevel,
+          'zoom': zoomLevel,
+        }
+      };
+
+      // Add to unlinked images cache
+      unlinkedImages.add({
+        'bytes': imageBytes,
+        'metadata': metadata,
+        'timestamp': DateTime.now(),
+      });
+
+      print('Image cached successfully. Total unlinked images: ${unlinkedImages.length}');
     } catch (e) {
-      print('Test audio failed: $e');
+      print('Error caching image: $e');
     }
   }
+
+
+
 
   // Start or stop VIA timer
   void _toggleViaTimer() async {
@@ -295,22 +399,41 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    // const streamUrl = 'http://192.168.1.150:5000/?action=stream';
-    const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    const streamUrl = 'http://192.168.1.54:5000/?action=stream';
+    // const streamUrl = 'http://192.168.1.54:8889/cam1/';
+    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
 
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // Camera feed
-          Positioned.fill(child: WebViewStream(url: streamUrl)),
+          // Camera feed with pinch-to-zoom
+          Positioned.fill(
+            child: InteractiveViewer(
+              minScale: 1.0,
+              maxScale: 5.0,
+              panEnabled: !isControlsDisabled,
+              scaleEnabled: !isControlsDisabled,
+              child: Transform.scale(
+                scale: zoomLevel,
+                child: WebViewStream(url: streamUrl),
+              ),
+            ),
+          ),
 
           // Green filter overlay when active
           if (isGreenFilterActive)
             Positioned.fill(
               child: Container(color: Colors.green.withOpacity(0.2)),
             ),
+
+          // Flashlight overlay when active
+          if (isFlashlightOn)
+            Positioned.fill(
+              child: Container(color: Colors.white.withOpacity(0.1)),
+            ),
+
 
           // Flash effect overlay - Fixed implementation
           if (showFlash && _flashOpacityAnimation != null)
@@ -346,33 +469,96 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                 // Center controls with minimal feedback to prevent shaking
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.white,
+                    // LED control button (flashlight icon)
+                    // IconButton(
+                    //   icon: Icon(
+                    //     isFlashlightOn ? Icons.flashlight_on : Icons.flashlight_off,
+                    //     color: isFlashlightOn ? Colors.yellow : Colors.white,
+                    //   ),
+                    //   onPressed: isControlsDisabled ? null : _toggleLED,
+                    //   tooltip: 'LED Light',
+                    // ),
+                    // Unlinked images indicator
+                    if (unlinkedImages.isNotEmpty)
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.image, color: Colors.orange),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${unlinkedImages.length} images ready to link in gallery'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            tooltip: '${unlinkedImages.length} unlinked images',
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                '${unlinkedImages.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      onPressed: () {},
-                    ),
+                    // LED brightness control button (flash icon)
                     IconButton(
-                      icon: const Icon(
-                        Icons.wb_sunny_outlined,
-                        color: Colors.white,
+                      icon: Icon(
+                        Icons.wb_sunny,
+                        color: isBrightnessControlVisible ? Colors.yellow : Colors.white,
                       ),
-                      onPressed: () {},
+                      onPressed: isControlsDisabled ? null : _toggleBrightnessControl,
+                      tooltip: 'LED Brightness',
                     ),
+                    // Zoom control button
                     IconButton(
-                      icon: const Icon(Icons.zoom_in, color: Colors.white),
-                      onPressed: () {},
+                      icon: Icon(
+                        Icons.zoom_in,
+                        color: isZoomControlVisible ? Colors.yellow : Colors.white,
+                      ),
+                      onPressed: isControlsDisabled ? null : _toggleZoomControl,
+                      tooltip: 'Zoom',
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.info_outline, color: Colors.white),
-                      onPressed: () {},
-                    ),
+                    // Toggle controls on/off button
+                    // IconButton(
+                    //   icon: Icon(
+                    //     isControlsDisabled ? Icons.block : Icons.toggle_on,
+                    //     color: isControlsDisabled ? Colors.red : Colors.white,
+                    //   ),
+                    //   onPressed: _toggleControlsDisabled,
+                    //   tooltip: isControlsDisabled ? 'Enable Controls' : 'Disable Controls',
+                    // ),
+                    // Compare images button
+                    // IconButton(
+                    //   icon: const Icon(Icons.compare, color: Colors.white),
+                    //   onPressed: isControlsDisabled ? null : (capturedImages.isNotEmpty ? _openComparison : null),
+                    //   tooltip: 'Compare Images',
+                    // ),
                     // Test audio button
-                    IconButton(
-                      icon: const Icon(Icons.volume_up, color: Colors.white),
-                      onPressed: _testAudio,
-                    ),
+                    // IconButton(
+                    //   icon: const Icon(Icons.volume_up, color: Colors.white),
+                    //   onPressed: isControlsDisabled ? null : _testAudio,
+                    //   tooltip: 'Test Audio',
+                    // ),
                   ],
                 ),
                 // Spacer for symmetry
@@ -381,6 +567,141 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             ),
           ),
 
+          // LED brightness control panel
+          if (isBrightnessControlVisible)
+            Positioned(
+              top: 100,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'LED Brightness',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.brightness_low, color: Colors.white),
+                        Expanded(
+                          child: Slider(
+                            value: brightnessLevel,
+                            min: 0.0,
+                            max: 1.0,
+                            activeColor: Colors.yellow,
+                            inactiveColor: Colors.grey,
+                            onChanged: _updateBrightness,
+                          ),
+                        ),
+                        const Icon(Icons.brightness_high, color: Colors.white),
+                      ],
+                    ),
+                    Text(
+                      'LED Stage: ${(brightnessLevel * 5).round()}/5 (${(brightnessLevel * 100).round()}%)',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Green filter control panel
+          if (isGreenFilterControlVisible)
+            Positioned(
+              top: 100,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Green Filter',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.filter_vintage, color: Colors.white),
+                        Expanded(
+                          child: Slider(
+                            value: greenFilterLevel,
+                            min: 0.0,
+                            max: 1.0,
+                            activeColor: Colors.green,
+                            inactiveColor: Colors.grey,
+                            onChanged: _updateGreenFilter,
+                          ),
+                        ),
+                        const Icon(Icons.filter_vintage, color: Colors.green),
+                      ],
+                    ),
+                    Text(
+                      'Filter Level: ${(greenFilterLevel * 5).round()}/5 (${(greenFilterLevel * 100).round()}%)',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Zoom control panel
+          if (isZoomControlVisible)
+            Positioned(
+              top: 100,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Zoom',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.zoom_out, color: Colors.white),
+                        Expanded(
+                          child: Slider(
+                            value: zoomLevel,
+                            min: 1.0,
+                            max: 5.0,
+                            activeColor: Colors.blue,
+                            inactiveColor: Colors.grey,
+                            onChanged: _updateZoom,
+                          ),
+                        ),
+                        const Icon(Icons.zoom_in, color: Colors.white),
+                      ],
+                    ),
+                    Text(
+                      '${zoomLevel.toStringAsFixed(1)}x',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Bottom controls
           Positioned(
             bottom: 30,
@@ -388,62 +709,23 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             right: 0,
             child: Column(
               children: [
-                // Mode selector (Photo/Video) - Segmented Control Style
+                // Photo mode indicator
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 180,
-                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
-                        children: [
-                          // Photo Button
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => isPhoto = true),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      isPhoto ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Photo',
-                                  style: TextStyle(
-                                    color: isPhoto ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Video Button
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => isPhoto = false),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      !isPhoto ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Video',
-                                  style: TextStyle(
-                                    color: !isPhoto ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: const Text(
+                        'Photo Mode',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                     // Timer display inline with toggle
@@ -468,86 +750,50 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                   ],
                 ),
                 const SizedBox(height: 30),
-                // Camera controls
+                // Camera controls - centered
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Green button with feedback
+                    // Green filter control button
                     GestureDetector(
-                      onTap: _toggleGreenFilter,
+                      onTap: _toggleGreenFilterControl,
                       child: Container(
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color:
-                              isGreenFilterActive
-                                  ? Colors.green.shade300
-                                  : Colors.green,
+                          color: isGreenFilterControlVisible
+                              ? Colors.green.shade300
+                              : Colors.green,
                           shape: BoxShape.circle,
-                          border:
-                              isGreenFilterActive
-                                  ? Border.all(color: Colors.white, width: 2)
-                                  : null,
+                          border: isGreenFilterControlVisible
+                              ? Border.all(color: Colors.white, width: 2)
+                              : null,
                         ),
                       ),
                     ),
-                    // Autofocus button
+                    const SizedBox(width: 30),
+                    // Shutter button for photo capture
                     GestureDetector(
-                      onTap: () => _triggerAutofocus(context),
-                      child: Container(
-                        width: 45,
-                        height: 45,
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.center_focus_strong,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    // Shutter button with more stable animation
-                    GestureDetector(
-                      onTap:
-                          isPhoto
-                              ? () => _captureImage(context)
-                              : _toggleRecording,
+                      onTap: () => _captureImage(context),
                       child: Container(
                         width: isShutterPressed ? 65 : 70,
                         height: isShutterPressed ? 65 : 70,
                         decoration: BoxDecoration(
-                          color:
-                              isRecording && !isPhoto
-                                  ? Colors.red
-                                  : Colors.white,
+                          color: Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: Colors.white,
                             width: isShutterPressed ? 3 : 5,
                           ),
                         ),
-                        child:
-                            isRecording && !isPhoto
-                                ? Center(
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.rectangle,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                )
-                                : Icon(
-                                  isPhoto ? Icons.camera : Icons.videocam,
-                                  color: Colors.black,
-                                  size: 30,
-                                ),
+                        child: Icon(
+                          Icons.camera,
+                          color: Colors.black,
+                          size: 30,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 30),
                     // VIA button
                     GestureDetector(
                       onTap: _toggleViaTimer,
@@ -574,6 +820,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         ),
                       ),
                     ),
+                    const SizedBox(width: 30),
                     // Menu/gallery button
                     GestureDetector(
                       onTap: _openGallery,

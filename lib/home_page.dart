@@ -11,6 +11,7 @@ import 'screens/user_profile_screen.dart';
 import 'main.dart';
 import 'login_page.dart';
 import 'connect_colposcope_screen.dart';
+import 'widgets/centralized_footer.dart';
 
 class HomePage extends StatefulWidget {
   final String? userEmail;
@@ -308,32 +309,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       ),
       appBar: CustomAppBar(
         infoIconKey: _infoIconKey,
-        onMenuSelected: (String value) {
-          // Handle menu item selection
-          switch (value) {
-            case 'wifi':
-              // Handle Wifi selection
-              break;
-            case 'microphone':
-              // Handle Microphone selection
-              break;
-            case 'bluetooth':
-              // Handle Bluetooth selection
-              break;
-            case 'logout':
-              _logout();
-              break;
-            case 'profile':
-              _showProfile();
-              break;
-            case 'settings':
-              // Navigate to settings
-              break;
-            case 'support':
-              // Navigate to support
-              break;
-          }
-        },
+        userEmail: widget.userEmail,
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -489,7 +465,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
                   );
                 },
               ),
-            )
+            ),
+            // Add centralized footer
+            const CentralizedFooter(),
           ],
         ),
       ),

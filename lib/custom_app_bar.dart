@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'connect_colposcope_screen.dart';
+// import 'home_page.dart';
+import 'screens/user_profile_screen.dart';
+// import 'main.dart';
+import 'login_page.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final Function(String) onMenuSelected;
   final Key? infoIconKey;
+  final String? userEmail; // Optional user email for profile navigation
+  final List<Widget>? extraActions;
+  final Widget? title; // Optional custom title
 
-  const CustomAppBar({Key? key, required this.onMenuSelected, this.infoIconKey}) : super(key: key);
+  const CustomAppBar({Key? key, this.infoIconKey, this.userEmail, this.extraActions, this.title}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
+      centerTitle: true,
+      titleSpacing: 0,
       leading: Builder(
         builder: (context) => IconButton(
           icon: Icon(Icons.menu, color: Colors.purple),
@@ -20,24 +28,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           },
         ),
       ),
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/logo.png',
-            height: 36,
-          ),
-          SizedBox(width: 8),
-          Text(
-            'Colposcope',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
+      title: title ?? Container(
+        padding: EdgeInsets.all(4),
+        // decoration: BoxDecoration(
+        //   border: Border.all(color: Color(0xFF8B44F7), width: 1.5),
+        //   borderRadius: BorderRadius.circular(8),
+        // ),
+        child: Image.asset(
+          'assets/images/griva_bg.png',
+          height: 36,
+        ),
       ),
       actions: [
         IconButton(
@@ -279,8 +279,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
           },
         ),
-        _buildPopupMenu(onMenuSelected),
-        _buildProfileMenu(onMenuSelected),
+        _buildPopupMenu(context),
+        _buildProfileMenu(context),
+        ...extraActions ?? [],
       ],
     );
   }
@@ -288,7 +289,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => Size.fromHeight(kToolbarHeight);
 
-  Widget _buildPopupMenu(Function(String) onMenuSelected) {
+  Widget _buildPopupMenu(BuildContext context) {
     return PopupMenuButton<String>(
       icon: Icon(Icons.settings, color: Color(0xFF8B44F7)),
       offset: Offset(0, 56),
@@ -315,11 +316,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: _buildPopupMenuItem(Icons.logout, 'Logout'),
         ),
       ],
-      onSelected: onMenuSelected,
+      onSelected: (String value) => _handleMenuSelection(context, value),
     );
   }
 
-  Widget _buildProfileMenu(Function(String) onMenuSelected) {
+  Widget _buildProfileMenu(BuildContext context) {
     return PopupMenuButton<String>(
       icon: Icon(Icons.person_outline, color: Color(0xFF8B44F7)),
       offset: Offset(0, 56),
@@ -346,8 +347,92 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: _buildPopupMenuItem(Icons.logout, 'Logout'),
         ),
       ],
-      onSelected: onMenuSelected,
+      onSelected: (String value) => _handleMenuSelection(context, value),
     );
+  }
+
+  void _handleMenuSelection(BuildContext context, String value) {
+    switch (value) {
+      case 'wifi':
+        _showFeatureDialog(context, 'WiFi Settings', 'WiFi functionality coming soon');
+        break;
+      case 'microphone':
+        _showFeatureDialog(context, 'Microphone Settings', 'Microphone functionality coming soon');
+        break;
+      case 'bluetooth':
+        _showFeatureDialog(context, 'Bluetooth Settings', 'Bluetooth functionality coming soon');
+        break;
+      case 'logout':
+        _handleLogout(context);
+        break;
+      case 'profile':
+        _handleProfile(context);
+        break;
+      case 'settings':
+        _showFeatureDialog(context, 'Settings', 'Settings functionality coming soon');
+        break;
+      case 'support':
+        _showFeatureDialog(context, 'Customer Support', 'Customer support functionality coming soon');
+        break;
+    }
+  }
+
+  void _showFeatureDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Logout'),
+        content: Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              // Navigate to login page and clear navigation stack
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => GrivaLoginPage()),
+                (route) => false,
+              );
+            },
+            child: Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleProfile(BuildContext context) {
+    if (userEmail != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(userEmail: userEmail!),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User information not available')),
+      );
+    }
   }
 
   Widget _buildPopupMenuItem(IconData icon, String text) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 // import 'package:google_fonts/google_fonts.dart';
 import 'home_page.dart';
 import 'services/user_service.dart';
+import 'widgets/centralized_footer.dart';
 
 class GrivaLoginPage extends StatefulWidget {
   const GrivaLoginPage({Key? key}) : super(key: key);
@@ -331,6 +332,9 @@ class _GrivaLoginPageState extends State<GrivaLoginPage> {
                   style: TextStyle(fontSize: 10, color: Colors.grey),
                 ),
                 SizedBox(height: 32), // Add extra padding at bottom
+                
+                // Centralized Footer
+                const CentralizedFooter(),
               ],
             ),
           ),

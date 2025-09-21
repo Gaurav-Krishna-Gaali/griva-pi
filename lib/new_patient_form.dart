@@ -4,9 +4,11 @@ import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
 import "exam_screen.dart";
 import 'services/patient_service.dart';
+import 'widgets/centralized_footer.dart';
 
 class NewPatientForm extends StatefulWidget {
-  const NewPatientForm({Key? key}) : super(key: key);
+  final Patient? patient;
+  const NewPatientForm({Key? key, this.patient}) : super(key: key);
 
   @override
   State<NewPatientForm> createState() => _NewPatientFormState();
@@ -59,6 +61,58 @@ class _NewPatientFormState extends State<NewPatientForm> {
   bool _isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    final p = widget.patient;
+    if (p != null) {
+      _nameController.text = p.patientName;
+      _patientIdController.text = p.patientId ?? '';
+      if (p.dateOfBirth != null) {
+        _dateOfBirthController.text = DateFormat('MM/dd/yyyy').format(p.dateOfBirth!);
+      }
+      if (p.dateOfVisit != null) {
+        _dateOfVisitController.text = DateFormat('MM/dd/yyyy').format(p.dateOfVisit!);
+      }
+      _mobileController.text = p.mobileNo;
+      _emailController.text = p.email ?? '';
+      _addressController.text = p.address ?? '';
+      _doctorNameController.text = p.doctorName ?? '';
+      _referredByController.text = p.referredBy ?? '';
+      _smokingValue = p.smoking;
+      _selectedBloodGroup = p.bloodGroup ?? _selectedBloodGroup;
+      _medicationController.text = p.medication ?? '';
+      _allergiesController.text = p.allergies ?? '';
+      _menopauseValue = p.menopause;
+      if (p.lastMenstrualDate != null) {
+        _lastMenstrualDateController.text = DateFormat('MM/dd/yyyy').format(p.lastMenstrualDate!);
+      }
+      _sexuallyActiveValue = p.sexuallyActive;
+      _selectedContraception = p.contraception ?? _selectedContraception;
+      _selectedHIVStatus = p.hivStatus ?? _selectedHIVStatus;
+      _pregnantValue = p.pregnant;
+      _liveBirths = p.liveBirths ?? 0;
+      _stillBirths = p.stillBirths ?? 0;
+      _abortions = p.abortions ?? 0;
+      _cesareans = p.cesareans ?? 0;
+      _miscarriages = p.miscarriages ?? 0;
+      _selectedHPVVaccination = p.hpvVaccination ?? _selectedHPVVaccination;
+      _referralReasonController.text = p.referralReason ?? '';
+      _symptomsController.text = p.symptoms ?? '';
+      _hpvTestValue = p.hpvTest;
+      _hpvResultValue = p.hpvResult;
+      if (p.hpvDate != null) {
+        _hpvDateController.text = DateFormat('MM/dd/yyyy').format(p.hpvDate!);
+      }
+      _hcgTestValue = p.hcgTest;
+      if (p.hcgDate != null) {
+        _hcgDateController.text = DateFormat('MM/dd/yyyy').format(p.hcgDate!);
+      }
+      _hcgLevelController.text = p.hcgLevel?.toString() ?? '';
+      _patientSummaryController.text = p.patientSummary ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _dateOfBirthController.dispose();
     _dateOfVisitController.dispose();
@@ -103,6 +157,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
     setState(() { _isSaving = true; });
     try {
       final patient = Patient(
+        id: widget.patient?.id,
         patientName: _nameController.text,
         patientId: _patientIdController.text,
         dateOfBirth: _dateOfBirthController.text.isNotEmpty ? DateFormat('MM/dd/yyyy').parse(_dateOfBirthController.text) : null,
@@ -138,7 +193,11 @@ class _NewPatientFormState extends State<NewPatientForm> {
         hcgLevel: _hcgLevelController.text.isNotEmpty ? double.tryParse(_hcgLevelController.text) : null,
         patientSummary: _patientSummaryController.text,
       );
-      await _patientService.createPatient(patient);
+      if (patient.id != null) {
+        await _patientService.updatePatient(patient.id!, patient);
+      } else {
+        await _patientService.createPatient(patient);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Patient saved successfully!')),
@@ -149,7 +208,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
             MaterialPageRoute(builder: (context) => const PiCameraScreen()),
           );
         } else {
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       }
     } catch (e) {
@@ -165,44 +224,27 @@ class _NewPatientFormState extends State<NewPatientForm> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isEditing = widget.patient != null;
     return Scaffold(
       drawer: CustomDrawer(),
-      appBar: CustomAppBar(
-        onMenuSelected: (String value) {
-          // Handle menu item selection
-          switch (value) {
-            case 'wifi':
-              // Handle Wifi selection
-              break;
-            case 'microphone':
-              // Handle Microphone selection
-              break;
-            case 'bluetooth':
-              // Handle Bluetooth selection
-              break;
-            case 'logout':
-              // Handle logout
-              break;
-            case 'profile':
-              // Navigate to profile
-              break;
-            case 'settings':
-              // Navigate to settings
-              break;
-            case 'support':
-              // Navigate to support
-              break;
-            case 'logout':
-              // Handle logout
-              break;
-          }
-        },
-      ),
-
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
+      appBar: CustomAppBar(),
+      backgroundColor: const Color.fromARGB(255,255,254,254),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: const InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+          ),
+        ),
+        child: Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Padding(
+              padding: const EdgeInsets.all(25.0),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Time and Date display
@@ -219,14 +261,14 @@ class _NewPatientFormState extends State<NewPatientForm> {
                             IconButton(
                               icon: const Icon(
                                 Icons.arrow_back,
-                                color: Colors.purple,
+                                color: Color.fromARGB(255,169,84,234),
                               ),
                               onPressed: () => Navigator.of(context).pop(),
                             ),
-                            const Text(
-                              'New Patient Form',
+                            Text(
+                              isEditing ? 'Edit Patient' : 'New Patient Form',
                               style: TextStyle(
-                                color: Colors.purple,
+                                color: Color.fromARGB(255,169,84,234),
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -263,7 +305,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               // Form Card
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
@@ -588,7 +630,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               // New General Medical History Section in a Card
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -712,7 +754,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -1081,7 +1123,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color.fromARGB(255,249,248,248),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -1280,7 +1322,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                   ElevatedButton(
                     onPressed: _isSaving ? null : () => _savePatient(goToExam: false),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
+                      backgroundColor: Color.fromARGB(255,169,84,234),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
@@ -1290,12 +1332,12 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text('Save and Edit'),
+                    child: Text(isEditing ? 'Update' : 'Save and Edit'),
                   ),
                   ElevatedButton(
                     onPressed: _isSaving ? null : () => _savePatient(goToExam: true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
+                      backgroundColor: Color.fromARGB(255,169,84,234),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
@@ -1305,24 +1347,22 @@ class _NewPatientFormState extends State<NewPatientForm> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text('Save and Start Exam'),
+                    child: Text(isEditing ? 'Update and Start Exam' : 'Save and Start Exam'),
                   ),
                 ],
               ),
 
               // Footer
               const SizedBox(height: 20),
-              Center(
-                child: Text(
-                  '© 2025 Griya. All rights reserved.',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 20),
+              const CentralizedFooter(),
             ],
           ),
         ),
       ),
+    ),
+    ),
+  ),
+),
     );
   }
 
@@ -1356,7 +1396,7 @@ class _NewPatientFormState extends State<NewPatientForm> {
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: () => onChanged(value + 1),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.purple,
+                  backgroundColor: Color.fromARGB(255,169,84,234),
                   foregroundColor: Colors.white,
                 ),
               ),
