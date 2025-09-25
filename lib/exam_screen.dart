@@ -408,8 +408,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // Camera feed with pinch-to-zoom
+          // Camera feed with pinch-to-zoom (fixed 16:9 aspect ratio, always fills screen)
           Positioned.fill(
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: FittedBox(
+                fit: BoxFit.cover,
             child: InteractiveViewer(
               minScale: 1.0,
               maxScale: 5.0,
@@ -418,6 +422,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
               child: Transform.scale(
                 scale: zoomLevel,
                 child: WebViewStream(url: streamUrl),
+                  ),
+                ),
               ),
             ),
           ),
@@ -521,14 +527,14 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         ],
                       ),
                     // LED brightness control button (flash icon)
-                    IconButton(
-                      icon: Icon(
-                        Icons.wb_sunny,
-                        color: isBrightnessControlVisible ? Colors.yellow : Colors.white,
-                      ),
-                      onPressed: isControlsDisabled ? null : _toggleBrightnessControl,
-                      tooltip: 'LED Brightness',
-                    ),
+                    // IconButton(
+                    //   icon: Icon(
+                    //     Icons.wb_sunny,
+                    //     color: isBrightnessControlVisible ? Colors.yellow : Colors.white,
+                    //   ),
+                    //   onPressed: isControlsDisabled ? null : _toggleBrightnessControl,
+                    //   tooltip: 'LED Brightness',
+                    // ),
                     // Zoom control button
                     IconButton(
                       icon: Icon(
