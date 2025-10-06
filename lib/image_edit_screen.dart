@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'config/app_config.dart';
 
 class ImageEditScreen extends StatefulWidget {
   final Uint8List imageBytes;
@@ -260,6 +263,50 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
     }
   }
 
+  Future<void> _runInference() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      final uri = Uri.parse(AppConfig.inferUrl);
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            _currentBytes,
+            filename: 'edited.jpg',
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      final streamed = await request.send();
+      if (streamed.statusCode == 200) {
+        final bytes = await streamed.stream.toBytes();
+        if (mounted) {
+          setState(() {
+            _currentBytes = bytes;
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Inference applied to image')),
+          );
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Inference failed: HTTP ${streamed.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Inference error: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _applyToCurrentImage() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
@@ -327,6 +374,18 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
         elevation: 1,
         title: const Text('Medical Image Editor'),
         actions: [
+          Tooltip(
+            message: 'Run server-side inference and update image',
+            child: TextButton(
+              onPressed: _runInference,
+              child: const Text('Infer'),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.purple[50],
+                foregroundColor: const Color(0xFF6B46C1),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           IconButton(
             onPressed: _resetAll,
             icon: const Icon(Icons.refresh),

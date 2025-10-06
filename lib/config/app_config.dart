@@ -16,6 +16,9 @@ class AppConfig {
   static String get mjpegStreamUrl => 'http://$baseHost:$httpPort/?action=stream';
   static String get videoFeedUrl => '$baseUrl/video_feed';
   static String get altCamUrl => 'http://$baseHost:8889/cam1/';
+
+  // Inference endpoint
+  static String get inferUrl => '$baseUrl/infer';
 }
 
 
