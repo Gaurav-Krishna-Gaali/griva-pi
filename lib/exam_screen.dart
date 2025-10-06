@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'gallery_screen.dart';
+import 'config/app_config.dart';
 
 class PiCameraScreen extends StatefulWidget {
   const PiCameraScreen({super.key});
@@ -81,9 +82,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Initialize LED to stage 0
   Future<void> _initializeLED() async {
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.54:5000/led?stage=0'),
-      );
+      final response = await http.post(Uri.parse(AppConfig.ledStageUrl(0)));
       
       if (response.statusCode == 200) {
         print('LED initialized to stage 0');
@@ -108,9 +107,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Turn off LED
   Future<void> _turnOffLED() async {
     try {
-      await http.post(
-        Uri.parse('http://192.168.1.54:5000/led?stage=0'),
-      );
+      await http.post(Uri.parse(AppConfig.ledStageUrl(0)));
       print('LED turned off');
     } catch (e) {
       print('Error turning off LED: $e');
@@ -145,9 +142,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Set green filter level
   Future<void> _setGreenFilterLevel(int level) async {
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.54:5000/green?level=$level'),
-      );
+      final response = await http.post(Uri.parse(AppConfig.greenFilterUrl(level)));
       
       if (response.statusCode == 200) {
         print('Green filter level set to $level successfully');
@@ -216,9 +211,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Set LED stage
   Future<void> _setLEDStage(int stage) async {
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.54:5000/led?stage=$stage'),
-      );
+      final response = await http.post(Uri.parse(AppConfig.ledStageUrl(stage)));
       
       if (response.statusCode == 200) {
         print('LED stage set to $stage successfully');
@@ -263,8 +256,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add new capture method
   Future<void> _captureImage(BuildContext context) async {
-    // const captureUrl = 'http://127.0.0.1:5000/capture';
-    const captureUrl = 'http://192.168.1.54:5000/capture';
+    final captureUrl = AppConfig.captureUrl;
 
     setState(() {
       isShutterPressed = true;
@@ -399,9 +391,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    const streamUrl = 'http://192.168.1.54:5000/?action=stream';
-    // const streamUrl = 'http://192.168.1.54:8889/cam1/';
-    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    final streamUrl = AppConfig.mjpegStreamUrl;
+    // final streamUrl = AppConfig.altCamUrl;
+    // final streamUrl = AppConfig.videoFeedUrl;
 
     return Scaffold(
       backgroundColor: Colors.black,
