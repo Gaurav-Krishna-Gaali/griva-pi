@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import '../services/patient_service.dart';
 import '../services/medical_report_service.dart';
-import 'clinical_data_form_screen.dart';
+import '../diagnosis_page.dart';
 
 class PatientSelectionScreen extends StatefulWidget {
   final List<Uint8List> images;
@@ -57,62 +57,27 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
       return;
     }
 
-    // Navigate to the new clinical data form
-    final reportData = await Navigator.push<Map<String, dynamic>>(
+    // Navigate to Diagnosis form which will generate the PDF on Save
+    final filePath = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
-        builder: (context) => const ClinicalDataFormScreen(),
+        builder: (context) => DiagnosisPage(patient: _selectedPatient!, images: widget.images),
       ),
     );
 
-    if (reportData == null) return; // User cancelled
+    if (filePath == null) return; // User cancelled or no file
 
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final filePath = await MedicalReportService.generateComprehensiveReport(
-        patient: _selectedPatient!,
-        images: widget.images,
-        chiefComplaint: reportData['chiefComplaint'],
-        cytologyReport: reportData['cytologyReport'],
-        pathologicalReport: reportData['pathologicalReport'],
-        colposcopyFindings: reportData['colposcopyFindings'],
-        finalImpression: reportData['finalImpression'],
-        remarks: reportData['remarks'],
-        treatmentProvided: reportData['treatmentProvided'],
-        precautions: reportData['precautions'],
-        examiningPhysician: reportData['examiningPhysician'],
-        forensicExamination: reportData['forensicExamination'] as Map<String, String>?,
-      );
-
-      if (mounted && filePath != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Comprehensive report generated successfully!'),
-            action: SnackBarAction(
-              label: 'Open',
-              onPressed: () => MedicalReportService.openReport(filePath),
-            ),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Comprehensive report generated successfully!'),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => MedicalReportService.openReport(filePath),
           ),
-        );
-        
-        // Navigate back to gallery
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating report: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+        ),
+      );
+      Navigator.pop(context);
     }
   }
 

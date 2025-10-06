@@ -12,14 +12,18 @@ import 'custom_drawer.dart';
 
 class GalleryScreen extends StatefulWidget {
   final List<Uint8List> images;
-  final Function(int) onDelete;
+  final Function(int)? onDelete;
   final List<Map<String, dynamic>>? unlinkedImages; // Cached images with metadata
+  final bool pickerMode; // When true, return selected images to caller
+  final String? pickerActionLabel;
 
   const GalleryScreen({
     Key? key,
     required this.images,
-    required this.onDelete,
+    this.onDelete,
     this.unlinkedImages,
+    this.pickerMode = false,
+    this.pickerActionLabel,
   }) : super(key: key);
 
   @override
@@ -57,7 +61,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
       // Adjust indices for selected items after deletion
       _selectedIndices = _selectedIndices.map((i) => i > index ? i - 1 : i).toSet();
     });
-    widget.onDelete(index);
+    if (widget.onDelete != null) {
+      widget.onDelete!(index);
+    }
   }
 
   void _toggleSelectionMode() {
@@ -131,7 +137,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
     if (_selectedIndices.isEmpty) return;
     
     final selectedImages = _selectedIndices.map((index) => _images[index]).toList();
-    
+    if (widget.pickerMode) {
+      Navigator.pop(context, selectedImages);
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -819,8 +829,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ),
             ),
             ElevatedButton.icon(
-              icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text('Proceed to Diagnosis'),
+              icon: Icon(widget.pickerMode ? Icons.check : Icons.arrow_forward, size: 16),
+              label: Text(widget.pickerMode ? (widget.pickerActionLabel ?? 'Use Selected') : 'Proceed to Diagnosis'),
               onPressed: _selectedIndices.isNotEmpty ? _proceedToDiagnosis : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6B46C1),
