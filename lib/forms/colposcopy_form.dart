@@ -24,7 +24,11 @@ class ColposcopyForm extends StatefulWidget {
   final String? initialFindingsSummary;
   final List<Uint8List>? initialImages;
   final ValueChanged<List<Uint8List>>? onImagesChanged;
-  const ColposcopyForm({super.key, this.initialPatientName, this.initialPatientId, this.initialDob, this.initialVisitDate, this.initialFindingsSummary, this.initialImages, this.onImagesChanged});
+  final ValueChanged<String>? onChiefComplaintChanged;
+  final ValueChanged<String>? onFindingsChanged;
+  final ValueChanged<String>? onFinalImpressionChanged;
+  final ValueChanged<String>? onRemarksChanged;
+  const ColposcopyForm({super.key, this.initialPatientName, this.initialPatientId, this.initialDob, this.initialVisitDate, this.initialFindingsSummary, this.initialImages, this.onImagesChanged, this.onChiefComplaintChanged, this.onFindingsChanged, this.onFinalImpressionChanged, this.onRemarksChanged});
 
   @override
   State<ColposcopyForm> createState() => _ColposcopyFormState();
@@ -128,6 +132,10 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
   void initState() {
     super.initState();
     _savedScoreCtrl = TextEditingController(text: _savedScore?.toString() ?? '');
+    // Emit chief complaint when 'Other' text changes
+    _otherCtrl.addListener(_emitChiefComplaintFromIndications);
+    // Emit remarks when findings summary changes
+    _findingsSummaryCtrl.addListener(_emitRemarksSummary);
     // Prefill from provided initial values
     if (widget.initialPatientName != null) {
       _patientNameCtrl.text = widget.initialPatientName!;
@@ -177,6 +185,8 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
 
   @override
   void dispose() {
+    _otherCtrl.removeListener(_emitChiefComplaintFromIndications);
+    _findingsSummaryCtrl.removeListener(_emitRemarksSummary);
     _patientNameCtrl.dispose();
     _patientIdCtrl.dispose();
     _otherCtrl.dispose();
@@ -259,13 +269,15 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _outlinedReport(context),
+            _outlinedReport(context),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton(
-                          onPressed: () {},
+                  onPressed: () {
+                    _emitFinalImpression();
+                  },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kYesNoPurple,
                             foregroundColor: Colors.white,
@@ -304,7 +316,7 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: Colors.grey.shade300, width: 1),
       ),
-      child: Padding(
+          child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,6 +362,17 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
               },
             ),
             const SizedBox(height: 16),
+            // Chief complaint derived from Indications
+            Builder(builder: (context) {
+              final String derivedChiefComplaint = _buildChiefComplaintFromIndications();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted && widget.onChiefComplaintChanged != null) {
+                  widget.onChiefComplaintChanged!(derivedChiefComplaint);
+                }
+              });
+              return const SizedBox.shrink();
+            }),
+            
             // Dates row responsive
             LayoutBuilder(
               builder: (context, constraints) {
@@ -385,15 +408,15 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
               runSpacing: 12,
               spacing: 24,
               children: [
-                _checkbox('Abnormal Pap smear', _indPapSmear, (v) => setState(() => _indPapSmear = v)),
-                _checkbox('Positive HPV test', _indHpv, (v) => setState(() => _indHpv = v)),
-                _checkbox('Postcoital bleeding', _indPostcoital, (v) => setState(() => _indPostcoital = v)),
-                _checkbox('Suspicious lesion on exam', _indSuspicious, (v) => setState(() => _indSuspicious = v)),
-                _checkbox('Follow-up of previous abnormal findings', _indFollowUp, (v) => setState(() => _indFollowUp = v)),
+                _checkbox('Abnormal Pap smear', _indPapSmear, (v) => setState(() { _indPapSmear = v; _emitChiefComplaintFromIndications(); })),
+                _checkbox('Positive HPV test', _indHpv, (v) => setState(() { _indHpv = v; _emitChiefComplaintFromIndications(); })),
+                _checkbox('Postcoital bleeding', _indPostcoital, (v) => setState(() { _indPostcoital = v; _emitChiefComplaintFromIndications(); })),
+                _checkbox('Suspicious lesion on exam', _indSuspicious, (v) => setState(() { _indSuspicious = v; _emitChiefComplaintFromIndications(); })),
+                _checkbox('Follow-up of previous abnormal findings', _indFollowUp, (v) => setState(() { _indFollowUp = v; _emitChiefComplaintFromIndications(); })),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Checkbox(value: _indOther, onChanged: (v) => setState(() => _indOther = v ?? false)),
+                    Checkbox(value: _indOther, onChanged: (v) => setState(() { _indOther = v ?? false; _emitChiefComplaintFromIndications(); })),
                     const SizedBox(width: 4),
                     const Text('Other'),
                     const SizedBox(width: 8),
@@ -477,7 +500,7 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
               child: _SegmentedToggle(
                 labels: const ['Fully Visible', 'Partially Visible', 'Not Visible'],
                 selectedIndex: _cervixVisibility == null ? -1 : _cervixVisibility == CervixVisibility.fully ? 0 : _cervixVisibility == CervixVisibility.partially ? 1 : 2,
-                onChanged: (i) => setState(() => _cervixVisibility = i == 0 ? CervixVisibility.fully : i == 1 ? CervixVisibility.partially : CervixVisibility.notVisible),
+                onChanged: (i) => setState(() { _cervixVisibility = i == 0 ? CervixVisibility.fully : i == 1 ? CervixVisibility.partially : CervixVisibility.notVisible; _emitFindingsFromExam(); }),
               ),
             ),
             const SizedBox(height: _qGap),
@@ -485,14 +508,14 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
               label: '3.2. Cervical findings (pre-acetic acid)',
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Wrap(spacing: 16, runSpacing: 8, children: [
-                  _radio<CervicalFinding>('Normal', CervicalFinding.normal, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Erythema', CervicalFinding.erythema, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Nabothian cysts', CervicalFinding.nabothianCysts, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Polyps', CervicalFinding.polyps, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Leukoplakia', CervicalFinding.leukoplakia, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Atrophy', CervicalFinding.atrophy, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Cervical ectopy', CervicalFinding.ectopy, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
-                  _radio<CervicalFinding>('Suspicious lesion(s)', CervicalFinding.suspicious, _cervicalFinding, (v) => setState(() => _cervicalFinding = v)),
+                  _radio<CervicalFinding>('Normal', CervicalFinding.normal, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Erythema', CervicalFinding.erythema, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Nabothian cysts', CervicalFinding.nabothianCysts, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Polyps', CervicalFinding.polyps, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Leukoplakia', CervicalFinding.leukoplakia, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Atrophy', CervicalFinding.atrophy, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Cervical ectopy', CervicalFinding.ectopy, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
+                  _radio<CervicalFinding>('Suspicious lesion(s)', CervicalFinding.suspicious, _cervicalFinding, (v) => setState(() { _cervicalFinding = v; _emitFindingsFromExam(); })),
                 ]),
                 const SizedBox(height: _qGap),
                 if (_cervicalFinding == CervicalFinding.suspicious)
@@ -500,12 +523,12 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
               ]),
             ),
             const SizedBox(height: _qGap),
-            _InlineField(label: '3.3. Acetic acid application (3–5%)', child: _SegmentedToggle(labels: const ['Used', 'Not used'], selectedIndex: _aceticUsed == null ? -1 : _aceticUsed! ? 0 : 1, onChanged: (i) => setState(() => _aceticUsed = i == 0))),
+            _InlineField(label: '3.3. Acetic acid application (3–5%)', child: _SegmentedToggle(labels: const ['Used', 'Not used'], selectedIndex: _aceticUsed == null ? -1 : _aceticUsed! ? 0 : 1, onChanged: (i) => setState(() { _aceticUsed = i == 0; _emitFindingsFromExam(); }))),
             const SizedBox(height: _qGap),
             _InlineField(
               label: '3.4. Acetowhite areas observed',
               child: Row(children: [
-                _SegmentedToggle(labels: const ['Yes', 'No'], selectedIndex: _awYes == null ? -1 : _awYes! ? 0 : 1, onChanged: (i) => setState(() => _awYes = i == 0)),
+                _SegmentedToggle(labels: const ['Yes', 'No'], selectedIndex: _awYes == null ? -1 : _awYes! ? 0 : 1, onChanged: (i) => setState(() { _awYes = i == 0; _emitFindingsFromExam(); })),
                 const SizedBox(width: 12),
                 if (_awYes == true) SizedBox(width: 260, child: TextField(controller: _awLocations, decoration: const InputDecoration(isDense: true, hintText: 'If yes, Locations', border: OutlineInputBorder()))),
               ]),
@@ -514,20 +537,20 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
             _LabeledField(
               label: '3.5. Margins of transformation zone',
               child: Wrap(spacing: 24, runSpacing: 8, children: [
-                _radio<ZoneMargins>('Fully seen (Type 1)', ZoneMargins.type1, _zoneMargins, (v) => setState(() => _zoneMargins = v)),
-                _radio<ZoneMargins>('Partially seen (Type 2)', ZoneMargins.type2, _zoneMargins, (v) => setState(() => _zoneMargins = v)),
-                _radio<ZoneMargins>('Not seen (Type 3)', ZoneMargins.type3, _zoneMargins, (v) => setState(() => _zoneMargins = v)),
+                _radio<ZoneMargins>('Fully seen (Type 1)', ZoneMargins.type1, _zoneMargins, (v) => setState(() { _zoneMargins = v; _emitFindingsFromExam(); })),
+                _radio<ZoneMargins>('Partially seen (Type 2)', ZoneMargins.type2, _zoneMargins, (v) => setState(() { _zoneMargins = v; _emitFindingsFromExam(); })),
+                _radio<ZoneMargins>('Not seen (Type 3)', ZoneMargins.type3, _zoneMargins, (v) => setState(() { _zoneMargins = v; _emitFindingsFromExam(); })),
               ]),
             ),
             const SizedBox(height: _qGap),
             _LabeledField(
               label: '3.6. Vascular patterns observed',
               child: Wrap(spacing: 16, runSpacing: 8, children: [
-                _radio<VascularPattern>('Fine punctation', VascularPattern.finePunctation, _vascularPattern, (v) => setState(() => _vascularPattern = v)),
-                _radio<VascularPattern>('Coarse punctation', VascularPattern.coarsePunctation, _vascularPattern, (v) => setState(() => _vascularPattern = v)),
-                _radio<VascularPattern>('Mosaic pattern', VascularPattern.mosaicPattern, _vascularPattern, (v) => setState(() => _vascularPattern = v)),
-                _radio<VascularPattern>('Atypical vessels', VascularPattern.atypicalVessels, _vascularPattern, (v) => setState(() => _vascularPattern = v)),
-                _radio<VascularPattern>('None', VascularPattern.none, _vascularPattern, (v) => setState(() => _vascularPattern = v)),
+                _radio<VascularPattern>('Fine punctation', VascularPattern.finePunctation, _vascularPattern, (v) => setState(() { _vascularPattern = v; _emitFindingsFromExam(); })),
+                _radio<VascularPattern>('Coarse punctation', VascularPattern.coarsePunctation, _vascularPattern, (v) => setState(() { _vascularPattern = v; _emitFindingsFromExam(); })),
+                _radio<VascularPattern>('Mosaic pattern', VascularPattern.mosaicPattern, _vascularPattern, (v) => setState(() { _vascularPattern = v; _emitFindingsFromExam(); })),
+                _radio<VascularPattern>('Atypical vessels', VascularPattern.atypicalVessels, _vascularPattern, (v) => setState(() { _vascularPattern = v; _emitFindingsFromExam(); })),
+                _radio<VascularPattern>('None', VascularPattern.none, _vascularPattern, (v) => setState(() { _vascularPattern = v; _emitFindingsFromExam(); })),
               ]),
             ),
 
@@ -546,11 +569,11 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
             _LabeledField(
               label: '3.9. Suspicion of',
               child: Wrap(spacing: 24, runSpacing: 8, children: [
-                _radio<Suspicion>('Low-grade lesion', Suspicion.low, _suspicion, (v) => setState(() => _suspicion = v)),
-                _radio<Suspicion>('High-grade lesion', Suspicion.high, _suspicion, (v) => setState(() => _suspicion = v)),
-                _radio<Suspicion>('Invasive cancer', Suspicion.invasive, _suspicion, (v) => setState(() => _suspicion = v)),
-                _radio<Suspicion>('Inflammation/benign', Suspicion.inflammation, _suspicion, (v) => setState(() => _suspicion = v)),
-                _radio<Suspicion>('Normal', Suspicion.normal, _suspicion, (v) => setState(() => _suspicion = v)),
+                _radio<Suspicion>('Low-grade lesion', Suspicion.low, _suspicion, (v) => setState(() { _suspicion = v; _emitFinalImpression(); })),
+                _radio<Suspicion>('High-grade lesion', Suspicion.high, _suspicion, (v) => setState(() { _suspicion = v; _emitFinalImpression(); })),
+                _radio<Suspicion>('Invasive cancer', Suspicion.invasive, _suspicion, (v) => setState(() { _suspicion = v; _emitFinalImpression(); })),
+                _radio<Suspicion>('Inflammation/benign', Suspicion.inflammation, _suspicion, (v) => setState(() { _suspicion = v; _emitFinalImpression(); })),
+                _radio<Suspicion>('Normal', Suspicion.normal, _suspicion, (v) => setState(() { _suspicion = v; _emitFinalImpression(); })),
               ]),
             ),
             const SizedBox(height: _qGap),
@@ -659,33 +682,27 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
             _LabeledField(
               label: '6.2. Follow-up recommendations:',
               child: Wrap(spacing: 24, runSpacing: 12, children: [
-                _checkbox('Await biopsy/histopathology results', _fuAwaitResults, (v) => setState(() => _fuAwaitResults = v)),
-                _checkbox('Repeat Pap/HPV test in 6–12 months', _fuRepeatPap, (v) => setState(() => _fuRepeatPap = v)),
-                _checkbox('Patient education provided', _fuEducation, (v) => setState(() => _fuEducation = v)),
-                _checkbox('Routine surveillance', _fuRoutine, (v) => setState(() => _fuRoutine = v)),
-                _checkbox('Referral to gynecologic oncologist', _fuReferral, (v) => setState(() => _fuReferral = v)),
+                _checkbox('Await biopsy/histopathology results', _fuAwaitResults, (v) => setState(() { _fuAwaitResults = v; _emitRemarksSummary(); })),
+                _checkbox('Repeat Pap/HPV test in 6–12 months', _fuRepeatPap, (v) => setState(() { _fuRepeatPap = v; _emitRemarksSummary(); })),
+                _checkbox('Patient education provided', _fuEducation, (v) => setState(() { _fuEducation = v; _emitRemarksSummary(); })),
+                _checkbox('Routine surveillance', _fuRoutine, (v) => setState(() { _fuRoutine = v; _emitRemarksSummary(); })),
+                _checkbox('Referral to gynecologic oncologist', _fuReferral, (v) => setState(() { _fuReferral = v; _emitRemarksSummary(); })),
                 Row(mainAxisSize: MainAxisSize.min, children: [
-                  _checkbox('Treatment', _fuTreatment, (v) => setState(() => _fuTreatment = v)),
+                  _checkbox('Treatment', _fuTreatment, (v) => setState(() { _fuTreatment = v; _emitRemarksSummary(); })),
                   const SizedBox(width: 8),
                   if (_fuTreatment)
                     SizedBox(
                       width: 200,
-                      child: TextField(
-                        controller: _fuTreatmentSpecifyCtrl,
-                        decoration: const InputDecoration(isDense: true, hintText: 'specify', border: OutlineInputBorder()),
-                      ),
+                      child: TextField(controller: _fuTreatmentSpecifyCtrl, decoration: const InputDecoration(isDense: true, hintText: 'specify', border: OutlineInputBorder()), onChanged: (_) => _emitRemarksSummary()),
                     ),
                 ]),
                 Row(mainAxisSize: MainAxisSize.min, children: [
-                  _checkbox('Other', _fuOther, (v) => setState(() => _fuOther = v)),
+                  _checkbox('Other', _fuOther, (v) => setState(() { _fuOther = v; _emitRemarksSummary(); })),
                   const SizedBox(width: 8),
                   if (_fuOther)
                     SizedBox(
                       width: 220,
-                      child: TextField(
-                        controller: _fuOtherSpecifyCtrl,
-                        decoration: const InputDecoration(isDense: true, hintText: 'If other, specify', border: OutlineInputBorder()),
-                      ),
+                      child: TextField(controller: _fuOtherSpecifyCtrl, decoration: const InputDecoration(isDense: true, hintText: 'If other, specify', border: OutlineInputBorder()), onChanged: (_) => _emitRemarksSummary()),
                     ),
                 ]),
               ]),
@@ -871,6 +888,182 @@ class _ColposcopyFormState extends State<ColposcopyForm> {
       _imageValidationError = false;
     });
     widget.onImagesChanged?.call(_currentImagesBytes);
+  }
+
+  // Derive chief complaint string from Indication checkboxes
+  String _buildChiefComplaintFromIndications() {
+    final List<String> reasons = [];
+    if (_indPapSmear) reasons.add('Abnormal Pap smear');
+    if (_indHpv) reasons.add('Positive HPV test');
+    if (_indPostcoital) reasons.add('Postcoital bleeding');
+    if (_indSuspicious) reasons.add('Suspicious lesion on exam');
+    if (_indFollowUp) reasons.add('Follow-up of previous abnormal findings');
+    if (_indOther && _otherCtrl.text.trim().isNotEmpty) reasons.add(_otherCtrl.text.trim());
+    if (reasons.isEmpty) return '';
+    return reasons.join(', ');
+  }
+
+  void _emitChiefComplaintFromIndications() {
+    if (widget.onChiefComplaintChanged != null) {
+      widget.onChiefComplaintChanged!(_buildChiefComplaintFromIndications());
+    }
+  }
+
+  // Build a summarized Colposcopy Findings from 3.1–3.6
+  String _buildFindingsSummary() {
+    final List<String> parts = [];
+    if (_cervixVisibility != null) {
+      final vis = _cervixVisibility == CervixVisibility.fully
+          ? 'Cervix fully visible'
+          : _cervixVisibility == CervixVisibility.partially
+              ? 'Cervix partially visible'
+              : 'Cervix not visible';
+      parts.add(vis);
+    }
+    if (_cervicalFinding != null) {
+      String cfLabel;
+      switch (_cervicalFinding) {
+        case CervicalFinding.normal:
+          cfLabel = 'Pre-acetic findings normal';
+          break;
+        case CervicalFinding.erythema:
+          cfLabel = 'Erythema present';
+          break;
+        case CervicalFinding.nabothianCysts:
+          cfLabel = 'Nabothian cysts present';
+          break;
+        case CervicalFinding.polyps:
+          cfLabel = 'Polyps present';
+          break;
+        case CervicalFinding.leukoplakia:
+          cfLabel = 'Leukoplakia present';
+          break;
+        case CervicalFinding.atrophy:
+          cfLabel = 'Atrophic changes';
+          break;
+        case CervicalFinding.ectopy:
+          cfLabel = 'Cervical ectopy present';
+          break;
+        case CervicalFinding.suspicious:
+          final extra = _cfSuspiciousText.text.trim();
+          cfLabel = extra.isEmpty ? 'Suspicious lesion(s)' : 'Suspicious lesion(s): $extra';
+          break;
+        default:
+          cfLabel = '';
+      }
+      if (cfLabel.isNotEmpty) parts.add(cfLabel);
+    }
+    if (_aceticUsed != null) {
+      parts.add(_aceticUsed! ? 'Acetic acid applied' : 'Acetic acid not used');
+    }
+    if (_awYes != null) {
+      final loc = _awYes == true && _awLocations.text.trim().isNotEmpty ? ' (${_awLocations.text.trim()})' : '';
+      parts.add(_awYes! ? 'Acetowhite areas observed$loc' : 'No acetowhite areas');
+    }
+    if (_zoneMargins != null) {
+      final zm = _zoneMargins == ZoneMargins.type1
+          ? 'TZ margins fully seen (Type 1)'
+          : _zoneMargins == ZoneMargins.type2
+              ? 'TZ margins partially seen (Type 2)'
+              : 'TZ margins not seen (Type 3)';
+      parts.add(zm);
+    }
+    if (_vascularPattern != null) {
+      String vp;
+      switch (_vascularPattern) {
+        case VascularPattern.finePunctation:
+          vp = 'Vascular pattern: fine punctation';
+          break;
+        case VascularPattern.coarsePunctation:
+          vp = 'Vascular pattern: coarse punctation';
+          break;
+        case VascularPattern.mosaicPattern:
+          vp = 'Vascular pattern: mosaic';
+          break;
+        case VascularPattern.atypicalVessels:
+          vp = 'Vascular pattern: atypical vessels';
+          break;
+        case VascularPattern.none:
+          vp = 'No abnormal vascular pattern';
+          break;
+        default:
+          vp = '';
+      }
+      if (vp.isNotEmpty) parts.add(vp);
+    }
+    return parts.join('; ');
+  }
+
+  void _emitFindingsFromExam() {
+    if (widget.onFindingsChanged != null) {
+      widget.onFindingsChanged!(_buildFindingsSummary());
+    }
+  }
+
+  // Build Final Impression from 3.9 Suspicion and 4.1 Swede Score
+  String _buildFinalImpression() {
+    final List<String> bits = [];
+    if (_suspicion != null) {
+      switch (_suspicion) {
+        case Suspicion.low:
+          bits.add('Suspicion: Low-grade lesion');
+          break;
+        case Suspicion.high:
+          bits.add('Suspicion: High-grade lesion');
+          break;
+        case Suspicion.invasive:
+          bits.add('Suspicion: Invasive cancer');
+          break;
+        case Suspicion.inflammation:
+          bits.add('Suspicion: Inflammation/benign');
+          break;
+        case Suspicion.normal:
+          bits.add('Suspicion: Normal');
+          break;
+        default:
+          break;
+      }
+    }
+    if (_savedScore != null) {
+      bits.add('Swede Score: $_savedScore');
+    }
+    return bits.join(' | ');
+  }
+
+  void _emitFinalImpression() {
+    if (widget.onFinalImpressionChanged != null) {
+      widget.onFinalImpressionChanged!(_buildFinalImpression());
+    }
+  }
+
+  // Build Remarks from Section 5 text + 6.2 selected follow-ups (if any)
+  String _buildRemarks() {
+    final List<String> rem = [];
+    final text = _findingsSummaryCtrl.text.trim();
+    if (text.isNotEmpty) rem.add(text);
+
+    final List<String> followUps = [];
+    if (_fuAwaitResults) followUps.add('Await biopsy/histopathology results');
+    if (_fuRepeatPap) followUps.add('Repeat Pap/HPV test in 6–12 months');
+    if (_fuEducation) followUps.add('Patient education provided');
+    if (_fuRoutine) followUps.add('Routine surveillance');
+    if (_fuReferral) followUps.add('Referral to gynecologic oncologist');
+    if (_fuTreatment) {
+      final t = _fuTreatmentSpecifyCtrl.text.trim();
+      followUps.add(t.isNotEmpty ? 'Treatment: $t' : 'Treatment');
+    }
+    if (_fuOther) {
+      final o = _fuOtherSpecifyCtrl.text.trim();
+      followUps.add(o.isNotEmpty ? 'Other: $o' : 'Other');
+    }
+    if (followUps.isNotEmpty) rem.add('Follow-up: ${followUps.join('; ')}');
+    return rem.join('\n');
+  }
+
+  void _emitRemarksSummary() {
+    if (widget.onRemarksChanged != null) {
+      widget.onRemarksChanged!(_buildRemarks());
+    }
   }
 }
 

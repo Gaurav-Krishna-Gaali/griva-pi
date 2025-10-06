@@ -333,6 +333,26 @@ class _DiagnosisPageState extends State<DiagnosisPage> {
                 ..addAll(imgs);
             });
           },
+          onChiefComplaintChanged: (value) {
+            setState(() {
+              _chiefComplaintController.text = value;
+            });
+          },
+          onFindingsChanged: (value) {
+            setState(() {
+              _colposcopyFindingsController.text = value;
+            });
+          },
+          onFinalImpressionChanged: (value) {
+            setState(() {
+              _finalImpressionController.text = value;
+            });
+          },
+          onRemarksChanged: (value) {
+            setState(() {
+              _remarksController.text = value;
+            });
+          },
         );
       case Procedure.vulvoscopy:
         return const VulvoscopyForm();
@@ -366,21 +386,16 @@ extension on _DiagnosisPageState {
           children: [
             _sectionTitle('Clinical Findings & Examination', theme),
             const SizedBox(height: 8),
-            TextField(controller: _chiefComplaintController, decoration: _lightInputDecoration('Chief Complaint')),
             const SizedBox(height: 12),
             TextField(controller: _cytologyReportController, decoration: _lightInputDecoration('Cytology Report')),
             const SizedBox(height: 12),
             TextField(controller: _pathologicalReportController, decoration: _lightInputDecoration('Pathological Report')),
             const SizedBox(height: 12),
-            TextField(
-              controller: _colposcopyFindingsController,
-              maxLines: 3,
-              decoration: _lightInputDecoration('Colposcopy Findings'),
-            ),
+            // Colposcopy Findings field removed; now derived from 3.1–3.6 in ColposcopyForm
             const SizedBox(height: 12),
-            TextField(controller: _finalImpressionController, decoration: _lightInputDecoration('Final Impression')),
+            // Final Impression field removed; now derived from 3.9 + 4.1 in ColposcopyForm
             const SizedBox(height: 12),
-            TextField(controller: _remarksController, decoration: _lightInputDecoration('Remarks')),
+            // Remarks field removed; now derived from Section 5 + 6.2 in ColposcopyForm
 
             const SizedBox(height: 20),
             _sectionTitle('Forensic Examination', theme),
