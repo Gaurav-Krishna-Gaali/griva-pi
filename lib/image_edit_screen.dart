@@ -266,8 +266,10 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
   Future<void> _runInference() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
+    
     try {
-      final uri = Uri.parse(AppConfig.inferUrl);
+      // Step 1: Send image to AI server via Port 5000 /ai/send endpoint
+      final uri = Uri.parse(AppConfig.aiSendUrl);
       final request = http.MultipartRequest('POST', uri)
         ..files.add(
           http.MultipartFile.fromBytes(
@@ -277,31 +279,89 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
             contentType: MediaType('image', 'jpeg'),
           ),
         );
+      
       final streamed = await request.send();
-      if (streamed.statusCode == 200) {
-        final bytes = await streamed.stream.toBytes();
-        if (mounted) {
-          setState(() {
-            _currentBytes = bytes;
-            _isProcessing = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Inference applied to image')),
-          );
-        }
-      } else {
-        if (mounted) {
-          setState(() => _isProcessing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Inference failed: HTTP ${streamed.statusCode}')),
-          );
-        }
+      if (streamed.statusCode != 200) {
+        throw Exception('Failed to send image to AI server: HTTP ${streamed.statusCode}');
       }
+      
+      final response = await streamed.stream.bytesToString();
+      debugPrint('AI send response: $response');
+      
+      // Step 2: Poll for AI processing completion
+      await _pollForAiResult();
+      
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Inference error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pollForAiResult() async {
+    const maxAttempts = 30; // 30 seconds max wait time
+    const pollInterval = Duration(seconds: 1);
+    
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Check AI status
+        final statusResponse = await http.get(Uri.parse(AppConfig.aiStatusUrl));
+        if (statusResponse.statusCode == 200) {
+          final statusData = statusResponse.body;
+          debugPrint('AI status: $statusData');
+          
+          // Parse status to check if result is ready
+          if (statusData.contains('"has_result": true')) {
+            // Result is ready, fetch the processed image
+            await _fetchAiResult();
+            return;
+          }
+        }
+        
+        // Wait before next poll
+        await Future.delayed(pollInterval);
+      } catch (e) {
+        debugPrint('Error polling AI status: $e');
+        await Future.delayed(pollInterval);
+      }
+    }
+    
+    // Timeout reached
+    if (mounted) {
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI inference timed out')),
+      );
+    }
+  }
+
+  Future<void> _fetchAiResult() async {
+    try {
+      // Fetch the processed result image
+      final resultResponse = await http.get(Uri.parse(AppConfig.aiResultUrl));
+      if (resultResponse.statusCode == 200) {
+        final resultBytes = resultResponse.bodyBytes;
+        
+        if (mounted) {
+          setState(() {
+            _currentBytes = resultBytes;
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('AI inference completed successfully')),
+          );
+        }
+      } else {
+        throw Exception('Failed to fetch AI result: HTTP ${resultResponse.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching AI result: $e')),
         );
       }
     }

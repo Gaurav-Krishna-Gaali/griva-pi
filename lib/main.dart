@@ -5,7 +5,6 @@ import 'dart:io' show Platform;
 import 'package:sqflite/sqflite.dart';
 import 'login_page.dart';
 import 'launch_screen.dart';
-import 'diagnosis_page.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 

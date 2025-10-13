@@ -20,7 +20,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isGreenFilterActive = false;
   bool showFlash = false;
   Uint8List? capturedImageBytes;
-  
+
   // New control states
   bool isFlashlightOn = false;
   bool isBrightnessControlVisible = false;
@@ -33,10 +33,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
-  
-  
+
   // Cache for unlinked images
-  final List<Map<String, dynamic>> unlinkedImages = []; // {bytes, metadata, timestamp}
+  final List<Map<String, dynamic>> unlinkedImages =
+      []; // {bytes, metadata, timestamp}
 
   // Timer variables
   Timer? _viaTimer;
@@ -114,8 +114,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
   }
 
-
-
   // Green filter control (slider for fine control)
   void _toggleGreenFilterControl() {
     setState(() {
@@ -132,10 +130,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     setState(() {
       greenFilterLevel = value;
     });
-    
+
     // Map green filter level (0.0-1.0) to levels (0-5)
     int filterLevel = (value * 5).round();
-    
+
     await _setGreenFilterLevel(filterLevel);
   }
 
@@ -150,16 +148,18 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         print('Failed to set green filter level: ${response.statusCode}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Green filter control failed: ${response.body}")),
+            SnackBar(
+              content: Text("Green filter control failed: ${response.body}"),
+            ),
           );
         }
       }
     } catch (e) {
       print('Error controlling green filter: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Green filter error: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Green filter error: $e")));
       }
     }
   }
@@ -182,9 +182,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     );
   }
 
-
-
-
   // Brightness control (slider for fine LED control)
   void _toggleBrightnessControl() {
     setState(() {
@@ -201,10 +198,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     setState(() {
       brightnessLevel = value;
     });
-    
+
     // Map brightness level (0.0-1.0) to LED stages (0-5)
     int ledStage = (value * 5).round();
-    
+
     await _setLEDStage(ledStage);
   }
 
@@ -226,13 +223,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     } catch (e) {
       print('Error controlling LED: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("LED error: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("LED error: $e")));
       }
     }
   }
-
 
   // Zoom control
   void _toggleZoomControl() {
@@ -244,8 +240,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       }
     });
   }
-
-
 
   // Update zoom level
   void _updateZoom(double value) {
@@ -314,7 +308,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
           'brightness': brightnessLevel,
           'green_filter': greenFilterLevel,
           'zoom': zoomLevel,
-        }
+        },
       };
 
       // Add to unlinked images cache
@@ -324,14 +318,13 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         'timestamp': DateTime.now(),
       });
 
-      print('Image cached successfully. Total unlinked images: ${unlinkedImages.length}');
+      print(
+        'Image cached successfully. Total unlinked images: ${unlinkedImages.length}',
+      );
     } catch (e) {
       print('Error caching image: $e');
     }
   }
-
-
-
 
   // Start or stop VIA timer
   void _toggleViaTimer() async {
@@ -342,7 +335,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         _isViaTimerRunning = false;
         _viaTimerSeconds = 60;
       });
-      
+
       // Play stop sound
       try {
         print('Playing stop sound...');
@@ -357,7 +350,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         _isViaTimerRunning = true;
         _viaTimerSeconds = 60;
       });
-      
+
       // Play start sound
       try {
         print('Playing start sound...');
@@ -366,7 +359,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       } catch (e) {
         print('Error playing start sound: $e');
       }
-      
+
       _viaTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) {
           setState(() {
@@ -375,13 +368,16 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             } else {
               _isViaTimerRunning = false;
               timer.cancel();
-              
+
               // Play completion sound
-              _audioPlayer.play(AssetSource('audio/timer_complete.mp3')).then((_) {
-                print('Completion sound played successfully');
-              }).catchError((e) {
-                print('Error playing completion sound: $e');
-              });
+              _audioPlayer
+                  .play(AssetSource('audio/timer_complete.mp3'))
+                  .then((_) {
+                    print('Completion sound played successfully');
+                  })
+                  .catchError((e) {
+                    print('Error playing completion sound: $e');
+                  });
             }
           });
         }
@@ -402,14 +398,20 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         children: [
           // Camera feed with pinch-to-zoom
           Positioned.fill(
-            child: InteractiveViewer(
-              minScale: 1.0,
-              maxScale: 5.0,
-              panEnabled: !isControlsDisabled,
-              scaleEnabled: !isControlsDisabled,
-              child: Transform.scale(
-                scale: zoomLevel,
-                child: WebViewStream(url: streamUrl),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: InteractiveViewer(
+                  minScale: 1.0,
+                  maxScale: 5.0,
+                  panEnabled: !isControlsDisabled,
+                  scaleEnabled: !isControlsDisabled,
+                  child: Transform.scale(
+                    scale: zoomLevel,
+                    child: WebViewStream(url: streamUrl),
+                  ),
+                ),
               ),
             ),
           ),
@@ -425,7 +427,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             Positioned.fill(
               child: Container(color: Colors.white.withOpacity(0.1)),
             ),
-
 
           // Flash effect overlay - Fixed implementation
           if (showFlash && _flashOpacityAnimation != null)
@@ -479,7 +480,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('${unlinkedImages.length} images ready to link in gallery'),
+                                  content: Text(
+                                    '${unlinkedImages.length} images ready to link in gallery',
+                                  ),
                                   duration: const Duration(seconds: 2),
                                 ),
                               );
@@ -525,7 +528,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     IconButton(
                       icon: Icon(
                         Icons.zoom_in,
-                        color: isZoomControlVisible ? Colors.yellow : Colors.white,
+                        color:
+                            isZoomControlVisible ? Colors.yellow : Colors.white,
                       ),
                       onPressed: isControlsDisabled ? null : _toggleZoomControl,
                       tooltip: 'Zoom',
@@ -706,7 +710,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(20),
@@ -724,7 +731,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     if (_isViaTimerRunning) ...[
                       const SizedBox(width: 20),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.red.withOpacity(0.8),
                           borderRadius: BorderRadius.circular(16),
@@ -753,13 +763,15 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color: isGreenFilterControlVisible
-                              ? Colors.green.shade300
-                              : Colors.green,
+                          color:
+                              isGreenFilterControlVisible
+                                  ? Colors.green.shade300
+                                  : Colors.green,
                           shape: BoxShape.circle,
-                          border: isGreenFilterControlVisible
-                              ? Border.all(color: Colors.white, width: 2)
-                              : null,
+                          border:
+                              isGreenFilterControlVisible
+                                  ? Border.all(color: Colors.white, width: 2)
+                                  : null,
                         ),
                       ),
                     ),
@@ -793,13 +805,15 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color: _isViaTimerRunning 
-                              ? Colors.red.withOpacity(0.8)
-                              : Colors.grey.withOpacity(0.5),
+                          color:
+                              _isViaTimerRunning
+                                  ? Colors.red.withOpacity(0.8)
+                                  : Colors.grey.withOpacity(0.5),
                           shape: BoxShape.circle,
-                          border: _isViaTimerRunning 
-                              ? Border.all(color: Colors.white, width: 2)
-                              : null,
+                          border:
+                              _isViaTimerRunning
+                                  ? Border.all(color: Colors.white, width: 2)
+                                  : null,
                         ),
                         alignment: Alignment.center,
                         child: Text(
