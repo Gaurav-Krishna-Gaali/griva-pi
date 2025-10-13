@@ -4,6 +4,7 @@ import 'connect_colposcope_screen.dart';
 import 'screens/user_profile_screen.dart';
 // import 'main.dart';
 import 'login_page.dart';
+import 'services/network_service.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Key? infoIconKey;
@@ -150,7 +151,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                                       ),
                                       SizedBox(height: 18),
                                       Text(
-                                        'Once both steps are complete, proceed to connection',
+                                        'Once both steps are complete, tap the button below to open network settings and connect to your device',
                                         style: TextStyle(fontSize: 13, color: Colors.black54),
                                         textAlign: TextAlign.center,
                                       ),
@@ -158,13 +159,60 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton(
-                                          onPressed: () {
+                                          onPressed: () async {
                                             Navigator.of(context).pop();
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) => ConnectColposcopeScreen(),
+                                            
+                                            // Show loading indicator
+                                            showDialog(
+                                              context: context,
+                                              barrierDismissible: false,
+                                              builder: (context) => Center(
+                                                child: CircularProgressIndicator(
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B44F7)),
+                                                ),
                                               ),
                                             );
+                                            
+                                            // Open native network settings
+                                            bool success = await NetworkService.openSpecificNetworkSettings(NetworkType.wifi);
+                                            
+                                            // Close loading indicator
+                                            Navigator.of(context).pop();
+                                            
+                                            if (success) {
+                                              // Show success message
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Network settings opened successfully'),
+                                                  backgroundColor: Colors.green,
+                                                  duration: Duration(seconds: 2),
+                                                ),
+                                              );
+                                              
+                                              // After a delay, navigate to connection screen
+                                              await Future.delayed(Duration(seconds: 2));
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => ConnectColposcopeScreen(),
+                                                ),
+                                              );
+                                            } else {
+                                              // Show error message and still navigate to connection screen
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Could not open network settings. Please check manually.'),
+                                                  backgroundColor: Colors.orange,
+                                                  duration: Duration(seconds: 3),
+                                                ),
+                                              );
+                                              
+                                              // Navigate to connection screen anyway
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => ConnectColposcopeScreen(),
+                                                ),
+                                              );
+                                            }
                                           },
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Color(0xFF8B44F7),
@@ -174,7 +222,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                           ),
-                                          child: Text('Continue to Connection'),
+                                          child: Text('Open Network Settings'),
                                         ),
                                       ),
                                     ],
