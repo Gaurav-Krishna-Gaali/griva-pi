@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'services/pdf_service.dart';
 import 'services/patient_service.dart';
 import 'services/image_service.dart';
@@ -9,6 +11,7 @@ import 'screens/patient_selection_screen.dart';
 import 'screens/image_comparison_screen.dart';
 import 'custom_app_bar.dart';
 import 'custom_drawer.dart';
+import 'config/app_config.dart';
 
 class GalleryScreen extends StatefulWidget {
   final List<Uint8List> images;
@@ -36,6 +39,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   bool _isSelectionMode = false;
   final PatientService _patientService = PatientService();
   List<Map<String, dynamic>> _unlinkedImages = [];
+  bool _isAiProcessing = false;
 
   @override
   void initState() {
@@ -261,6 +265,271 @@ class _GalleryScreenState extends State<GalleryScreen> {
         );
       }
     }
+  }
+
+  Future<void> _runAiInference() async {
+    if (_selectedIndices.length != 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select exactly one image for AI processing')),
+      );
+      return;
+    }
+
+    if (_isAiProcessing) return;
+    
+    setState(() => _isAiProcessing = true);
+    
+    // Show loading dialog
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Processing with AI...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'This may take a few moments',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    
+    try {
+      final index = _selectedIndices.first;
+      final imageBytes = _images[index];
+      
+      // Step 1: Send image to AI server
+      final uri = Uri.parse(AppConfig.aiSendUrl);
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            imageBytes,
+            filename: 'image.jpg',
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      
+      final streamed = await request.send();
+      if (streamed.statusCode != 200) {
+        throw Exception('Failed to send image to AI server: HTTP ${streamed.statusCode}');
+      }
+      
+      final response = await streamed.stream.bytesToString();
+      debugPrint('AI send response: $response');
+      
+      // Step 2: Poll result.jpg directly until it's ready
+      final resultBytes = await _pollResultImage();
+      
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+      }
+      
+      if (mounted && resultBytes != null) {
+        setState(() => _isAiProcessing = false);
+        _showAiResultModal(resultBytes, index);
+      } else if (mounted) {
+        setState(() => _isAiProcessing = false);
+      }
+      
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        setState(() => _isAiProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('AI inference error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<Uint8List?> _pollResultImage() async {
+    const maxAttempts = 30; // 30 seconds max wait time
+    const pollInterval = Duration(seconds: 1);
+    
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Directly try to fetch the result image
+        final resultResponse = await http.get(Uri.parse(AppConfig.aiResultUrl));
+        
+        if (resultResponse.statusCode == 200) {
+          // Result is ready!
+          return resultResponse.bodyBytes;
+        } else {
+          // Result not ready yet (might be 404 or other status)
+          debugPrint('Result not ready yet (HTTP ${resultResponse.statusCode}), attempt ${attempt + 1}/$maxAttempts');
+        }
+      } catch (e) {
+        // Result not ready yet (connection error, 404, etc.)
+        debugPrint('Result not ready yet (error: $e), attempt ${attempt + 1}/$maxAttempts');
+      }
+      
+      // Wait before next poll
+      await Future.delayed(pollInterval);
+    }
+    
+    // Timeout reached
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI inference timed out')),
+      );
+    }
+    return null;
+  }
+
+  void _showAiResultModal(Uint8List resultBytes, int originalIndex) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 800),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Colors.orange, size: 24),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'AI Processing Result',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // Image preview
+              Flexible(
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      resultBytes,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Cancel'),
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.save, size: 18),
+                      label: const Text('Save'),
+                      onPressed: () {
+                        setState(() {
+                          _images[originalIndex] = resultBytes;
+                        });
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Image updated with AI result')),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6B46C1),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.copy, size: 18),
+                      label: const Text('Save as Copy'),
+                      onPressed: () {
+                        setState(() {
+                          _images.add(resultBytes);
+                        });
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('AI result saved as new image')),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showPdfOptions() async {
@@ -691,6 +960,30 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               minimumSize: const Size(0, 32),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: _isAiProcessing
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(Icons.auto_awesome, size: 16),
+                            label: const Text('AI Process'),
+                            onPressed: (_selectedIndices.length == 1 && !_isAiProcessing)
+                                ? _runAiInference
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              minimumSize: const Size(0, 32),
+                              disabledBackgroundColor: Colors.grey,
                             ),
                           ),
                         ],

@@ -288,8 +288,8 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
       final response = await streamed.stream.bytesToString();
       debugPrint('AI send response: $response');
       
-      // Step 2: Poll for AI processing completion
-      await _pollForAiResult();
+      // Step 2: Poll result.jpg directly until it's ready
+      await _pollResultImage();
       
     } catch (e) {
       if (mounted) {
@@ -301,32 +301,40 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
     }
   }
 
-  Future<void> _pollForAiResult() async {
+  Future<void> _pollResultImage() async {
     const maxAttempts = 30; // 30 seconds max wait time
     const pollInterval = Duration(seconds: 1);
     
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        // Check AI status
-        final statusResponse = await http.get(Uri.parse(AppConfig.aiStatusUrl));
-        if (statusResponse.statusCode == 200) {
-          final statusData = statusResponse.body;
-          debugPrint('AI status: $statusData');
-          
-          // Parse status to check if result is ready
-          if (statusData.contains('"has_result": true')) {
-            // Result is ready, fetch the processed image
-            await _fetchAiResult();
-            return;
-          }
-        }
+        // Directly try to fetch the result image
+        final resultResponse = await http.get(Uri.parse(AppConfig.aiResultUrl));
         
-        // Wait before next poll
-        await Future.delayed(pollInterval);
+        if (resultResponse.statusCode == 200) {
+          // Result is ready!
+          final resultBytes = resultResponse.bodyBytes;
+          
+          if (mounted) {
+            setState(() {
+              _currentBytes = resultBytes;
+              _isProcessing = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('AI inference completed successfully')),
+            );
+          }
+          return; // Success, exit polling loop
+        } else {
+          // Result not ready yet (might be 404 or other status)
+          debugPrint('Result not ready yet (HTTP ${resultResponse.statusCode}), attempt ${attempt + 1}/$maxAttempts');
+        }
       } catch (e) {
-        debugPrint('Error polling AI status: $e');
-        await Future.delayed(pollInterval);
+        // Result not ready yet (connection error, 404, etc.)
+        debugPrint('Result not ready yet (error: $e), attempt ${attempt + 1}/$maxAttempts');
       }
+      
+      // Wait before next poll
+      await Future.delayed(pollInterval);
     }
     
     // Timeout reached
@@ -335,35 +343,6 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI inference timed out')),
       );
-    }
-  }
-
-  Future<void> _fetchAiResult() async {
-    try {
-      // Fetch the processed result image
-      final resultResponse = await http.get(Uri.parse(AppConfig.aiResultUrl));
-      if (resultResponse.statusCode == 200) {
-        final resultBytes = resultResponse.bodyBytes;
-        
-        if (mounted) {
-          setState(() {
-            _currentBytes = resultBytes;
-            _isProcessing = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('AI inference completed successfully')),
-          );
-        }
-      } else {
-        throw Exception('Failed to fetch AI result: HTTP ${resultResponse.statusCode}');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching AI result: $e')),
-        );
-      }
     }
   }
 
