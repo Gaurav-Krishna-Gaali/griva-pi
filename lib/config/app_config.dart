@@ -22,6 +22,9 @@ class AppConfig {
   static String get aiSendUrl => '$baseUrl/ai/send';
   static String get aiStatusUrl => '$baseUrl/ai/status';
   static String get aiResultUrl => '$baseUrl/result.jpg';
+
+  // Socket.IO endpoint
+  static String get socketIoUrl => 'http://$baseHost:$httpPort';
 }
 
 

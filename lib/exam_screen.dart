@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'gallery_screen.dart';
 import 'config/app_config.dart';
 
@@ -50,6 +51,13 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   late AnimationController _flashAnimationController;
   Animation<double>? _flashOpacityAnimation;
 
+  // Socket.IO client
+  IO.Socket? _socket;
+  bool _isSocketConnected = false;
+  List<Map<String, dynamic>> _socketMessages = []; // {message, timestamp, type}
+  bool _isDisposed = false; // Flag to prevent state updates after dispose
+  BuildContext? _currentContext; // Store context for Socket.IO triggered actions
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +85,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
     // Initialize LED to stage 0
     _initializeLED();
+
+    // Connect to Socket.IO server
+    _connectSocket();
   }
 
   // Initialize LED to stage 0
@@ -94,8 +105,177 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
   }
 
+  // Connect to Socket.IO server
+  void _connectSocket() {
+    try {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔧 [WebSocket] Initializing connection...');
+      print('   URL: ${AppConfig.socketIoUrl}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      _socket = IO.io(
+        AppConfig.socketIoUrl,
+        IO.OptionBuilder()
+            .setTransports(['websocket'])
+            .disableAutoConnect()
+            .build(),
+      );
+
+      print('✓ [WebSocket] Socket instance created');
+      print('✓ [WebSocket] Setting up event listeners...');
+
+      // Listen for ANY event FIRST (before specific listeners) to catch everything
+      _socket!.onAny((event, data) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🎯 [WebSocket] onAny() - EVENT DETECTED');
+        print('   Event Name: "$event"');
+        print('   Timestamp: $timestamp');
+        print('   Data Type: ${data.runtimeType}');
+        print('   Data: $data');
+        print('   Data (String): ${data.toString()}');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        // Handle system events
+        if (event == 'connect') {
+          // Handled by onConnect
+          return;
+        } else if (event == 'disconnect') {
+          // Handled by onDisconnect
+          return;
+        } else if (event == 'error') {
+          // Handled by onError
+          return;
+        } else {
+          // Handle all other events (including 'message', 'notification', etc.)
+          _handleSocketMessage(data, event);
+        }
+      });
+
+      _socket!.onConnect((_) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🔌 [WebSocket] CONNECTED at $timestamp');
+        print('   URL: ${AppConfig.socketIoUrl}');
+        print('   Socket ID: ${_socket?.id ?? 'N/A'}');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        if (!_isDisposed && mounted) {
+          try {
+            setState(() {
+              _isSocketConnected = true;
+            });
+          } catch (e) {
+            print('❌ Error updating state on connect: $e');
+          }
+        }
+      });
+
+      _socket!.onDisconnect((_) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🔌 [WebSocket] DISCONNECTED at $timestamp');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        if (!_isDisposed && mounted) {
+          try {
+            setState(() {
+              _isSocketConnected = false;
+            });
+          } catch (e) {
+            print('❌ Error updating state on disconnect: $e');
+          }
+        }
+      });
+
+      _socket!.onError((error) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('❌ [WebSocket] ERROR at $timestamp');
+        print('   Error: $error');
+        print('   Error Type: ${error.runtimeType}');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      });
+
+      // Listen for specific message event (in case server sends with 'message' event name)
+      _socket!.on('message', (data) {
+        print('📨 [WebSocket] Received "message" event (specific listener)');
+        _handleSocketMessage(data, 'message');
+      });
+
+      // Listen for notification event
+      _socket!.on('notification', (data) {
+        print('🔔 [WebSocket] Received "notification" event (specific listener)');
+        _handleSocketMessage(data, 'notification');
+      });
+
+      print('✓ [WebSocket] All listeners set up');
+      print('✓ [WebSocket] Attempting to connect...');
+      
+      // Connect manually after setting up listeners
+      _socket!.connect();
+    } catch (e, stackTrace) {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('❌ [WebSocket] Error connecting to Socket.IO');
+      print('   Error: $e');
+      print('   StackTrace: $stackTrace');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+  }
+
+  void _handleSocketMessage(dynamic data, String eventType) {
+    final timestamp = DateTime.now().toIso8601String();
+    final messageStr = data.toString().toLowerCase().trim();
+    
+    // Log message details to console
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📩 [WebSocket] MESSAGE RECEIVED');
+    print('   Event Type: $eventType');
+    print('   Timestamp: $timestamp');
+    print('   Data Type: ${data.runtimeType}');
+    print('   Data: $data');
+    print('   Data (String): ${data.toString()}');
+    
+    // Check if message is "capture" to trigger image capture
+    if (messageStr == 'capture' || messageStr.contains('capture')) {
+      print('   ⚡ CAPTURE TRIGGER DETECTED!');
+      print('   → Triggering camera capture...');
+      if (!_isDisposed && mounted && _currentContext != null) {
+        _captureImage(_currentContext!);
+        print('   ✓ Capture function called');
+      } else {
+        print('   ⚠️  Cannot capture: disposed=${_isDisposed}, mounted=$mounted, context=${_currentContext != null}');
+      }
+    }
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    if (!_isDisposed && mounted) {
+      try {
+        setState(() {
+          _socketMessages.insert(0, {
+            'message': data.toString(),
+            'timestamp': DateTime.now(),
+            'type': eventType,
+          });
+          // Keep only last 50 messages
+          if (_socketMessages.length > 50) {
+            _socketMessages.removeLast();
+          }
+        });
+      } catch (e) {
+        print('❌ Error updating state on message: $e');
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _isDisposed = true; // Mark as disposed to prevent state updates
+    
+    // Remove all socket listeners before disconnecting
+    _socket?.clearListeners();
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+    
     _flashAnimationController.dispose();
     _viaTimer?.cancel();
     _audioPlayer.dispose();
@@ -387,6 +567,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Store context for Socket.IO triggered actions
+    _currentContext = context;
+    
     final streamUrl = AppConfig.mjpegStreamUrl;
     // final streamUrl = AppConfig.altCamUrl;
     // final streamUrl = AppConfig.videoFeedUrl;
@@ -875,6 +1058,165 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                 ),
               ),
             ),
+
+          // Socket.IO Messages Display
+          if (_socketMessages.isNotEmpty)
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: _buildSocketMessagesWidget(),
+            ),
+
+          // Socket.IO Connection Status Indicator
+          Positioned(
+            top: 100,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isSocketConnected 
+                    ? Colors.green.withOpacity(0.8)
+                    : Colors.red.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isSocketConnected ? Icons.wifi : Icons.wifi_off,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isSocketConnected ? 'Connected' : 'Disconnected',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSocketMessagesWidget() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 200),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24, width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[900]?.withOpacity(0.9),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.message, color: Colors.orange, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Messages (${_socketMessages.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    setState(() {
+                      _socketMessages.clear();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Messages List
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              reverse: false,
+              itemCount: _socketMessages.length > 10 ? 10 : _socketMessages.length,
+              itemBuilder: (context, index) {
+                final message = _socketMessages[index];
+                final timestamp = message['timestamp'] as DateTime;
+                final messageText = message['message'] as String;
+                final eventType = message['type'] as String;
+                
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800]?.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              eventType,
+                              style: const TextStyle(
+                                color: Colors.orange,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        messageText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

@@ -51,6 +51,7 @@ dependencies:
   webview_flutter: ^4.13.0
   flutter_mjpeg: ^2.0.4
   open_settings_plus: ^0.4.0
+  socket_io_client: ^2.0.3
 
 dev_dependencies:
   flutter_test:
