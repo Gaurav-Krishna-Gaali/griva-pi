@@ -54,7 +54,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Socket.IO client
   IO.Socket? _socket;
   bool _isSocketConnected = false;
-  List<Map<String, dynamic>> _socketMessages = []; // {message, timestamp, type}
   bool _isDisposed = false; // Flag to prevent state updates after dispose
   BuildContext? _currentContext; // Store context for Socket.IO triggered actions
 
@@ -247,23 +246,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
     print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    if (!_isDisposed && mounted) {
-      try {
-        setState(() {
-          _socketMessages.insert(0, {
-            'message': data.toString(),
-            'timestamp': DateTime.now(),
-            'type': eventType,
-          });
-          // Keep only last 50 messages
-          if (_socketMessages.length > 50) {
-            _socketMessages.removeLast();
-          }
-        });
-      } catch (e) {
-        print('❌ Error updating state on message: $e');
-      }
-    }
+    // Messages are logged to console but not displayed in UI
   }
 
   @override
@@ -1059,15 +1042,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
               ),
             ),
 
-          // Socket.IO Messages Display
-          if (_socketMessages.isNotEmpty)
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: _buildSocketMessagesWidget(),
-            ),
-
           // Socket.IO Connection Status Indicator
           Positioned(
             top: 100,
@@ -1106,121 +1080,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     );
   }
 
-  Widget _buildSocketMessagesWidget() {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24, width: 1),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey[900]?.withOpacity(0.9),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.message, color: Colors.orange, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'Messages (${_socketMessages.length})',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () {
-                    setState(() {
-                      _socketMessages.clear();
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          // Messages List
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              reverse: false,
-              itemCount: _socketMessages.length > 10 ? 10 : _socketMessages.length,
-              itemBuilder: (context, index) {
-                final message = _socketMessages[index];
-                final timestamp = message['timestamp'] as DateTime;
-                final messageText = message['message'] as String;
-                final eventType = message['type'] as String;
-                
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800]?.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              eventType,
-                              style: const TextStyle(
-                                color: Colors.orange,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}',
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        messageText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class WebViewStream extends StatelessWidget {
