@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'config/app_config.dart';
 
 class ImageEditScreen extends StatefulWidget {
   final Uint8List imageBytes;
@@ -260,6 +263,89 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
     }
   }
 
+  Future<void> _runInference() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    
+    try {
+      // Step 1: Send image to AI server via Port 5000 /ai/send endpoint
+      final uri = Uri.parse(AppConfig.aiSendUrl);
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            _currentBytes,
+            filename: 'edited.jpg',
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      
+      final streamed = await request.send();
+      if (streamed.statusCode != 200) {
+        throw Exception('Failed to send image to AI server: HTTP ${streamed.statusCode}');
+      }
+      
+      final response = await streamed.stream.bytesToString();
+      debugPrint('AI send response: $response');
+      
+      // Step 2: Poll result.jpg directly until it's ready
+      await _pollResultImage();
+      
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Inference error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pollResultImage() async {
+    const maxAttempts = 30; // 30 seconds max wait time
+    const pollInterval = Duration(seconds: 1);
+    
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Directly try to fetch the result image
+        final resultResponse = await http.get(Uri.parse(AppConfig.aiResultUrl));
+        
+        if (resultResponse.statusCode == 200) {
+          // Result is ready!
+          final resultBytes = resultResponse.bodyBytes;
+          
+          if (mounted) {
+            setState(() {
+              _currentBytes = resultBytes;
+              _isProcessing = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('AI inference completed successfully')),
+            );
+          }
+          return; // Success, exit polling loop
+        } else {
+          // Result not ready yet (might be 404 or other status)
+          debugPrint('Result not ready yet (HTTP ${resultResponse.statusCode}), attempt ${attempt + 1}/$maxAttempts');
+        }
+      } catch (e) {
+        // Result not ready yet (connection error, 404, etc.)
+        debugPrint('Result not ready yet (error: $e), attempt ${attempt + 1}/$maxAttempts');
+      }
+      
+      // Wait before next poll
+      await Future.delayed(pollInterval);
+    }
+    
+    // Timeout reached
+    if (mounted) {
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI inference timed out')),
+      );
+    }
+  }
+
   Future<void> _applyToCurrentImage() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
@@ -327,6 +413,18 @@ class _ImageEditScreenState extends State<ImageEditScreen> {
         elevation: 1,
         title: const Text('Medical Image Editor'),
         actions: [
+          Tooltip(
+            message: 'Run server-side inference and update image',
+            child: TextButton(
+              onPressed: _runInference,
+              child: const Text('Infer'),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.purple[50],
+                foregroundColor: const Color(0xFF6B46C1),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           IconButton(
             onPressed: _resetAll,
             icon: const Icon(Icons.refresh),

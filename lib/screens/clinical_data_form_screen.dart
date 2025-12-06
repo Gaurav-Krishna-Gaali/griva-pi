@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../custom_app_bar.dart';
 
 class ClinicalDataFormScreen extends StatefulWidget {
   const ClinicalDataFormScreen({super.key});
@@ -84,16 +85,13 @@ class _ClinicalDataFormScreenState extends State<ClinicalDataFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Enter Clinical Details'),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        actions: [
+      appBar: CustomAppBar(
+        extraActions: [
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: _onSave,
             tooltip: 'Save and Generate Report',
-          )
+          ),
         ],
       ),
       backgroundColor: Colors.grey[900],
@@ -104,6 +102,10 @@ class _ClinicalDataFormScreenState extends State<ClinicalDataFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/diagnosis'),
+                child: const Text('Open Diagnosis'),
+              ),
               _buildSectionTitle('Clinical Findings & Examination'),
               _buildTextFormField(controller: _chiefComplaintController, label: 'Chief Complaint', color: Colors.green),
               _buildTextFormField(controller: _cytologyReportController, label: 'Cytology Report', color: Colors.blue),

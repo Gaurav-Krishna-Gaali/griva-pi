@@ -4,7 +4,9 @@ import 'package:http/http.dart' as http;
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'gallery_screen.dart';
+import 'config/app_config.dart';
 
 class PiCameraScreen extends StatefulWidget {
   const PiCameraScreen({super.key});
@@ -19,7 +21,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isGreenFilterActive = false;
   bool showFlash = false;
   Uint8List? capturedImageBytes;
-  
+
   // New control states
   bool isFlashlightOn = false;
   bool isBrightnessControlVisible = false;
@@ -32,10 +34,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
-  
-  
+
   // Cache for unlinked images
-  final List<Map<String, dynamic>> unlinkedImages = []; // {bytes, metadata, timestamp}
+  final List<Map<String, dynamic>> unlinkedImages =
+      []; // {bytes, metadata, timestamp}
 
   // Timer variables
   Timer? _viaTimer;
@@ -48,6 +50,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Animation controller declared but initialized in initState
   late AnimationController _flashAnimationController;
   Animation<double>? _flashOpacityAnimation;
+
+  // Socket.IO client
+  IO.Socket? _socket;
+  bool _isSocketConnected = false;
+  bool _isDisposed = false; // Flag to prevent state updates after dispose
+  BuildContext? _currentContext; // Store context for Socket.IO triggered actions
 
   @override
   void initState() {
@@ -76,14 +84,15 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
     // Initialize LED to stage 0
     _initializeLED();
+
+    // Connect to Socket.IO server
+    _connectSocket();
   }
 
   // Initialize LED to stage 0
   Future<void> _initializeLED() async {
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.54:5000/led?stage=0'),
-      );
+      final response = await http.post(Uri.parse(AppConfig.ledStageUrl(0)));
       
       if (response.statusCode == 200) {
         print('LED initialized to stage 0');
@@ -95,8 +104,161 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     }
   }
 
+  // Connect to Socket.IO server
+  void _connectSocket() {
+    try {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔧 [WebSocket] Initializing connection...');
+      print('   URL: ${AppConfig.socketIoUrl}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      _socket = IO.io(
+        AppConfig.socketIoUrl,
+        IO.OptionBuilder()
+            .setTransports(['websocket'])
+            .disableAutoConnect()
+            .build(),
+      );
+
+      print('✓ [WebSocket] Socket instance created');
+      print('✓ [WebSocket] Setting up event listeners...');
+
+      // Listen for ANY event FIRST (before specific listeners) to catch everything
+      _socket!.onAny((event, data) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🎯 [WebSocket] onAny() - EVENT DETECTED');
+        print('   Event Name: "$event"');
+        print('   Timestamp: $timestamp');
+        print('   Data Type: ${data.runtimeType}');
+        print('   Data: $data');
+        print('   Data (String): ${data.toString()}');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        // Handle system events
+        if (event == 'connect') {
+          // Handled by onConnect
+          return;
+        } else if (event == 'disconnect') {
+          // Handled by onDisconnect
+          return;
+        } else if (event == 'error') {
+          // Handled by onError
+          return;
+        } else {
+          // Handle all other events (including 'message', 'notification', etc.)
+          _handleSocketMessage(data, event);
+        }
+      });
+
+      _socket!.onConnect((_) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🔌 [WebSocket] CONNECTED at $timestamp');
+        print('   URL: ${AppConfig.socketIoUrl}');
+        print('   Socket ID: ${_socket?.id ?? 'N/A'}');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        if (!_isDisposed && mounted) {
+          try {
+            setState(() {
+              _isSocketConnected = true;
+            });
+          } catch (e) {
+            print('❌ Error updating state on connect: $e');
+          }
+        }
+      });
+
+      _socket!.onDisconnect((_) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🔌 [WebSocket] DISCONNECTED at $timestamp');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        if (!_isDisposed && mounted) {
+          try {
+            setState(() {
+              _isSocketConnected = false;
+            });
+          } catch (e) {
+            print('❌ Error updating state on disconnect: $e');
+          }
+        }
+      });
+
+      _socket!.onError((error) {
+        final timestamp = DateTime.now().toIso8601String();
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('❌ [WebSocket] ERROR at $timestamp');
+        print('   Error: $error');
+        print('   Error Type: ${error.runtimeType}');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      });
+
+      // Listen for specific message event (in case server sends with 'message' event name)
+      _socket!.on('message', (data) {
+        print('📨 [WebSocket] Received "message" event (specific listener)');
+        _handleSocketMessage(data, 'message');
+      });
+
+      // Listen for notification event
+      _socket!.on('notification', (data) {
+        print('🔔 [WebSocket] Received "notification" event (specific listener)');
+        _handleSocketMessage(data, 'notification');
+      });
+
+      print('✓ [WebSocket] All listeners set up');
+      print('✓ [WebSocket] Attempting to connect...');
+      
+      // Connect manually after setting up listeners
+      _socket!.connect();
+    } catch (e, stackTrace) {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('❌ [WebSocket] Error connecting to Socket.IO');
+      print('   Error: $e');
+      print('   StackTrace: $stackTrace');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+  }
+
+  void _handleSocketMessage(dynamic data, String eventType) {
+    final timestamp = DateTime.now().toIso8601String();
+    final messageStr = data.toString().toLowerCase().trim();
+    
+    // Log message details to console
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📩 [WebSocket] MESSAGE RECEIVED');
+    print('   Event Type: $eventType');
+    print('   Timestamp: $timestamp');
+    print('   Data Type: ${data.runtimeType}');
+    print('   Data: $data');
+    print('   Data (String): ${data.toString()}');
+    
+    // Check if message is "capture" to trigger image capture
+    if (messageStr == 'capture' || messageStr.contains('capture')) {
+      print('   ⚡ CAPTURE TRIGGER DETECTED!');
+      print('   → Triggering camera capture...');
+      if (!_isDisposed && mounted && _currentContext != null) {
+        _captureImage(_currentContext!);
+        print('   ✓ Capture function called');
+      } else {
+        print('   ⚠️  Cannot capture: disposed=${_isDisposed}, mounted=$mounted, context=${_currentContext != null}');
+      }
+    }
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Messages are logged to console but not displayed in UI
+  }
+
   @override
   void dispose() {
+    _isDisposed = true; // Mark as disposed to prevent state updates
+    
+    // Remove all socket listeners before disconnecting
+    _socket?.clearListeners();
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+    
     _flashAnimationController.dispose();
     _viaTimer?.cancel();
     _audioPlayer.dispose();
@@ -108,16 +270,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Turn off LED
   Future<void> _turnOffLED() async {
     try {
-      await http.post(
-        Uri.parse('http://192.168.1.54:5000/led?stage=0'),
-      );
+      await http.post(Uri.parse(AppConfig.ledStageUrl(0)));
       print('LED turned off');
     } catch (e) {
       print('Error turning off LED: $e');
     }
   }
-
-
 
   // Green filter control (slider for fine control)
   void _toggleGreenFilterControl() {
@@ -135,19 +293,17 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     setState(() {
       greenFilterLevel = value;
     });
-    
+
     // Map green filter level (0.0-1.0) to levels (0-5)
     int filterLevel = (value * 5).round();
-    
+
     await _setGreenFilterLevel(filterLevel);
   }
 
   // Set green filter level
   Future<void> _setGreenFilterLevel(int level) async {
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.54:5000/green?level=$level'),
-      );
+      final response = await http.post(Uri.parse(AppConfig.greenFilterUrl(level)));
       
       if (response.statusCode == 200) {
         print('Green filter level set to $level successfully');
@@ -155,16 +311,18 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         print('Failed to set green filter level: ${response.statusCode}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Green filter control failed: ${response.body}")),
+            SnackBar(
+              content: Text("Green filter control failed: ${response.body}"),
+            ),
           );
         }
       }
     } catch (e) {
       print('Error controlling green filter: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Green filter error: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Green filter error: $e")));
       }
     }
   }
@@ -187,9 +345,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     );
   }
 
-
-
-
   // Brightness control (slider for fine LED control)
   void _toggleBrightnessControl() {
     setState(() {
@@ -206,19 +361,17 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     setState(() {
       brightnessLevel = value;
     });
-    
+
     // Map brightness level (0.0-1.0) to LED stages (0-5)
     int ledStage = (value * 5).round();
-    
+
     await _setLEDStage(ledStage);
   }
 
   // Set LED stage
   Future<void> _setLEDStage(int stage) async {
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.54:5000/led?stage=$stage'),
-      );
+      final response = await http.post(Uri.parse(AppConfig.ledStageUrl(stage)));
       
       if (response.statusCode == 200) {
         print('LED stage set to $stage successfully');
@@ -233,13 +386,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     } catch (e) {
       print('Error controlling LED: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("LED error: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("LED error: $e")));
       }
     }
   }
-
 
   // Zoom control
   void _toggleZoomControl() {
@@ -252,8 +404,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     });
   }
 
-
-
   // Update zoom level
   void _updateZoom(double value) {
     setState(() {
@@ -263,8 +413,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   // Add new capture method
   Future<void> _captureImage(BuildContext context) async {
-    // const captureUrl = 'http://127.0.0.1:5000/capture';
-    const captureUrl = 'http://192.168.1.54:5000/capture';
+    final captureUrl = AppConfig.captureUrl;
 
     setState(() {
       isShutterPressed = true;
@@ -322,7 +471,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
           'brightness': brightnessLevel,
           'green_filter': greenFilterLevel,
           'zoom': zoomLevel,
-        }
+        },
       };
 
       // Add to unlinked images cache
@@ -332,14 +481,13 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         'timestamp': DateTime.now(),
       });
 
-      print('Image cached successfully. Total unlinked images: ${unlinkedImages.length}');
+      print(
+        'Image cached successfully. Total unlinked images: ${unlinkedImages.length}',
+      );
     } catch (e) {
       print('Error caching image: $e');
     }
   }
-
-
-
 
   // Start or stop VIA timer
   void _toggleViaTimer() async {
@@ -350,7 +498,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         _isViaTimerRunning = false;
         _viaTimerSeconds = 60;
       });
-      
+
       // Play stop sound
       try {
         print('Playing stop sound...');
@@ -365,7 +513,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         _isViaTimerRunning = true;
         _viaTimerSeconds = 60;
       });
-      
+
       // Play start sound
       try {
         print('Playing start sound...');
@@ -374,7 +522,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       } catch (e) {
         print('Error playing start sound: $e');
       }
-      
+
       _viaTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) {
           setState(() {
@@ -383,13 +531,16 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             } else {
               _isViaTimerRunning = false;
               timer.cancel();
-              
+
               // Play completion sound
-              _audioPlayer.play(AssetSource('audio/timer_complete.mp3')).then((_) {
-                print('Completion sound played successfully');
-              }).catchError((e) {
-                print('Error playing completion sound: $e');
-              });
+              _audioPlayer
+                  .play(AssetSource('audio/timer_complete.mp3'))
+                  .then((_) {
+                    print('Completion sound played successfully');
+                  })
+                  .catchError((e) {
+                    print('Error playing completion sound: $e');
+                  });
             }
           });
         }
@@ -399,9 +550,12 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    const streamUrl = 'http://192.168.1.54:5000/?action=stream';
-    // const streamUrl = 'http://192.168.1.54:8889/cam1/';
-    // const streamUrl = 'http://127.0.0.1:5000/video_feed';
+    // Store context for Socket.IO triggered actions
+    _currentContext = context;
+    
+    final streamUrl = AppConfig.mjpegStreamUrl;
+    // final streamUrl = AppConfig.altCamUrl;
+    // final streamUrl = AppConfig.videoFeedUrl;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -414,14 +568,14 @@ class _PiCameraScreenState extends State<PiCameraScreen>
               aspectRatio: 16 / 9,
               child: FittedBox(
                 fit: BoxFit.cover,
-            child: InteractiveViewer(
-              minScale: 1.0,
-              maxScale: 5.0,
-              panEnabled: !isControlsDisabled,
-              scaleEnabled: !isControlsDisabled,
-              child: Transform.scale(
-                scale: zoomLevel,
-                child: WebViewStream(url: streamUrl),
+                child: InteractiveViewer(
+                  minScale: 1.0,
+                  maxScale: 5.0,
+                  panEnabled: !isControlsDisabled,
+                  scaleEnabled: !isControlsDisabled,
+                  child: Transform.scale(
+                    scale: zoomLevel,
+                    child: WebViewStream(url: streamUrl),
                   ),
                 ),
               ),
@@ -439,7 +593,6 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             Positioned.fill(
               child: Container(color: Colors.white.withOpacity(0.1)),
             ),
-
 
           // Flash effect overlay - Fixed implementation
           if (showFlash && _flashOpacityAnimation != null)
@@ -493,7 +646,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('${unlinkedImages.length} images ready to link in gallery'),
+                                  content: Text(
+                                    '${unlinkedImages.length} images ready to link in gallery',
+                                  ),
                                   duration: const Duration(seconds: 2),
                                 ),
                               );
@@ -539,7 +694,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     IconButton(
                       icon: Icon(
                         Icons.zoom_in,
-                        color: isZoomControlVisible ? Colors.yellow : Colors.white,
+                        color:
+                            isZoomControlVisible ? Colors.yellow : Colors.white,
                       ),
                       onPressed: isControlsDisabled ? null : _toggleZoomControl,
                       tooltip: 'Zoom',
@@ -720,7 +876,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(20),
@@ -738,7 +897,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                     if (_isViaTimerRunning) ...[
                       const SizedBox(width: 20),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.red.withOpacity(0.8),
                           borderRadius: BorderRadius.circular(16),
@@ -767,13 +929,15 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color: isGreenFilterControlVisible
-                              ? Colors.green.shade300
-                              : Colors.green,
+                          color:
+                              isGreenFilterControlVisible
+                                  ? Colors.green.shade300
+                                  : Colors.green,
                           shape: BoxShape.circle,
-                          border: isGreenFilterControlVisible
-                              ? Border.all(color: Colors.white, width: 2)
-                              : null,
+                          border:
+                              isGreenFilterControlVisible
+                                  ? Border.all(color: Colors.white, width: 2)
+                                  : null,
                         ),
                       ),
                     ),
@@ -807,13 +971,15 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         width: 45,
                         height: 45,
                         decoration: BoxDecoration(
-                          color: _isViaTimerRunning 
-                              ? Colors.red.withOpacity(0.8)
-                              : Colors.grey.withOpacity(0.5),
+                          color:
+                              _isViaTimerRunning
+                                  ? Colors.red.withOpacity(0.8)
+                                  : Colors.grey.withOpacity(0.5),
                           shape: BoxShape.circle,
-                          border: _isViaTimerRunning 
-                              ? Border.all(color: Colors.white, width: 2)
-                              : null,
+                          border:
+                              _isViaTimerRunning
+                                  ? Border.all(color: Colors.white, width: 2)
+                                  : null,
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -875,10 +1041,45 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                 ),
               ),
             ),
+
+          // Socket.IO Connection Status Indicator
+          Positioned(
+            top: 100,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isSocketConnected 
+                    ? Colors.green.withOpacity(0.8)
+                    : Colors.red.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isSocketConnected ? Icons.wifi : Icons.wifi_off,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isSocketConnected ? 'Connected' : 'Disconnected',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+
 }
 
 class WebViewStream extends StatelessWidget {
