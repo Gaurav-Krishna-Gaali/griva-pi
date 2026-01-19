@@ -5,6 +5,10 @@ import 'dart:typed_data';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:video_player/video_player.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'dart:io';
 import 'gallery_screen.dart';
 import 'config/app_config.dart';
 
@@ -21,6 +25,8 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   bool isGreenFilterActive = false;
   bool showFlash = false;
   Uint8List? capturedImageBytes;
+  Uint8List? capturedVideoBytes;
+  bool _isFetchingVideo = false;
 
   // New control states
   bool isFlashlightOn = false;
@@ -35,14 +41,33 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   // Add list to store captured images
   final List<Uint8List> capturedImages = [];
 
+  // Add list to store captured videos
+  final List<Uint8List> capturedVideos = [];
+
   // Cache for unlinked images
   final List<Map<String, dynamic>> unlinkedImages =
+      []; // {bytes, metadata, timestamp}
+  
+  // Cache for unlinked videos
+  final List<Map<String, dynamic>> unlinkedVideos =
       []; // {bytes, metadata, timestamp}
 
   // Timer variables
   Timer? _viaTimer;
   int _viaTimerSeconds = 60;
   bool _isViaTimerRunning = false;
+  
+  // Preview auto-dismiss timers
+  Timer? _imagePreviewTimer;
+  Timer? _videoPreviewTimer;
+
+  // Recording state
+  bool _isRecording = false;
+  
+  // Video preview player
+  VideoPlayerController? _previewVideoController;
+  bool _isPreviewVideoPlaying = false;
+  bool _isVideoPlayerSupported = true; // Will be set based on platform support
 
   // Audio player for timer sounds
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -261,7 +286,10 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     
     _flashAnimationController.dispose();
     _viaTimer?.cancel();
+    _imagePreviewTimer?.cancel();
+    _videoPreviewTimer?.cancel();
     _audioPlayer.dispose();
+    _previewVideoController?.dispose();
     // Turn off LED when screen is disposed
     _turnOffLED();
     super.dispose();
@@ -334,10 +362,17 @@ class _PiCameraScreenState extends State<PiCameraScreen>
         builder:
             (context) => GalleryScreen(
               images: capturedImages,
+              videos: capturedVideos,
               unlinkedImages: unlinkedImages,
+              unlinkedVideos: unlinkedVideos,
               onDelete: (index) {
                 setState(() {
                   capturedImages.removeAt(index);
+                });
+              },
+              onDeleteVideo: (index) {
+                setState(() {
+                  capturedVideos.removeAt(index);
                 });
               },
             ),
@@ -438,6 +473,16 @@ class _PiCameraScreenState extends State<PiCameraScreen>
 
         // Store image in cache with metadata
         await _cacheImage(response.bodyBytes);
+        
+        // Auto-dismiss image preview after 5 seconds
+        _imagePreviewTimer?.cancel();
+        _imagePreviewTimer = Timer(const Duration(seconds: 5), () {
+          if (mounted) {
+            setState(() {
+              capturedImageBytes = null;
+            });
+          }
+        });
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Failed to capture image: ${response.body}")),
@@ -486,6 +531,283 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       );
     } catch (e) {
       print('Error caching image: $e');
+    }
+  }
+
+  // Cache video temporarily
+  Future<void> _cacheVideo(Uint8List videoBytes) async {
+    try {
+      // Create metadata for the video
+      final metadata = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'led_stage': (brightnessLevel * 5).round(),
+        'green_filter_level': (greenFilterLevel * 5).round(),
+        'zoom_level': zoomLevel,
+        'capture_settings': {
+          'brightness': brightnessLevel,
+          'green_filter': greenFilterLevel,
+          'zoom': zoomLevel,
+        },
+      };
+
+      // Add to unlinked videos cache
+      unlinkedVideos.add({
+        'bytes': videoBytes,
+        'metadata': metadata,
+        'timestamp': DateTime.now(),
+      });
+
+      print(
+        'Video cached successfully. Total unlinked videos: ${unlinkedVideos.length}',
+      );
+    } catch (e) {
+      print('Error caching video: $e');
+    }
+  }
+
+  // Initialize video player for preview
+  Future<void> _initializePreviewVideo(Uint8List videoBytes) async {
+    try {
+      // Dispose existing controller if any
+      await _previewVideoController?.dispose();
+      _previewVideoController = null;
+      
+      // Check if platform supports video player
+      // video_player doesn't support Windows/Linux/Web well
+      if (Platform.isWindows || Platform.isLinux) {
+        print('Video player not fully supported on this platform. Showing fallback UI.');
+        _isVideoPlayerSupported = false;
+        if (mounted) {
+          setState(() {});
+        }
+        return;
+      }
+      
+      // Save video bytes to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final videoFile = File(path.join(tempDir.path, 'preview_video_${DateTime.now().millisecondsSinceEpoch}.mp4'));
+      await videoFile.writeAsBytes(videoBytes);
+
+      // Create video player controller
+      _previewVideoController = VideoPlayerController.file(videoFile);
+      await _previewVideoController!.initialize();
+      
+      _previewVideoController!.addListener(() {
+        if (mounted) {
+          setState(() {
+            _isPreviewVideoPlaying = _previewVideoController!.value.isPlaying;
+          });
+        }
+      });
+
+      _isVideoPlayerSupported = true;
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error initializing preview video: $e');
+      // Mark as not supported and show fallback UI
+      _isVideoPlayerSupported = false;
+      _previewVideoController = null;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  // Toggle video preview play/pause
+  void _togglePreviewVideoPlayback() {
+    if (_previewVideoController == null || !_isVideoPlayerSupported) {
+      // If video player not supported, just show a message or open gallery
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video playback available in gallery'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    setState(() {
+      if (_previewVideoController!.value.isPlaying) {
+        _previewVideoController!.pause();
+      } else {
+        _previewVideoController!.play();
+      }
+    });
+  }
+
+  // Start recording
+  Future<void> _startRecording() async {
+    try {
+      final response = await http.post(Uri.parse(AppConfig.recordingStartUrl));
+      
+      if (response.statusCode == 200) {
+        setState(() {
+          _isRecording = true;
+        });
+        print('Recording started successfully');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Recording started'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        print('Failed to start recording: ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Failed to start recording: ${response.body}"),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error starting recording: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Recording error: $e")),
+        );
+      }
+    }
+  }
+
+  // Stop recording and fetch video
+  Future<void> _stopRecording() async {
+    try {
+      // First, stop the recording
+      final stopResponse = await http.post(Uri.parse(AppConfig.recordingStopUrl));
+      
+      if (stopResponse.statusCode == 200) {
+        setState(() {
+          _isRecording = false;
+          _isFetchingVideo = true;
+        });
+        print('Recording stopped successfully');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Recording stopped. Processing video...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        // Wait a bit for server to process the video
+        await Future.delayed(const Duration(seconds: 1));
+
+        // Fetch the processed video
+        try {
+          final videoResponse = await http.get(Uri.parse(AppConfig.recordingVideoUrl));
+          
+          if (videoResponse.statusCode == 200 && mounted) {
+            setState(() {
+              capturedVideoBytes = videoResponse.bodyBytes;
+              capturedVideos.add(videoResponse.bodyBytes);
+              _isFetchingVideo = false;
+            });
+            print('Video fetched successfully (${videoResponse.bodyBytes.length} bytes)');
+            
+            // Cache video with metadata
+            await _cacheVideo(videoResponse.bodyBytes);
+            
+            // Initialize video player for preview
+            await _initializePreviewVideo(videoResponse.bodyBytes);
+            
+            // Auto-dismiss video preview after 5 seconds
+            _videoPreviewTimer?.cancel();
+            _videoPreviewTimer = Timer(const Duration(seconds: 5), () {
+              if (mounted) {
+                _previewVideoController?.dispose();
+                _previewVideoController = null;
+                setState(() {
+                  capturedVideoBytes = null;
+                });
+              }
+            });
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Video ready'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            }
+          } else if (videoResponse.statusCode == 202) {
+            // Server is still processing (202 Accepted)
+            setState(() {
+              _isFetchingVideo = false;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Video is being processed. Check back later.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
+          } else {
+            setState(() {
+              _isFetchingVideo = false;
+            });
+            print('Failed to fetch video: ${videoResponse.statusCode}');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("Video not ready yet: ${videoResponse.body}"),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          setState(() {
+            _isFetchingVideo = false;
+          });
+          print('Error fetching video: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Error fetching video: $e"),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } else {
+        print('Failed to stop recording: ${stopResponse.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Failed to stop recording: ${stopResponse.body}"),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error stopping recording: $e');
+      setState(() {
+        _isFetchingVideo = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Recording error: $e")),
+        );
+      }
+    }
+  }
+
+  // Toggle recording
+  void _toggleRecording() {
+    if (_isRecording) {
+      _stopRecording();
+    } else {
+      _startRecording();
     }
   }
 
@@ -553,9 +875,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     // Store context for Socket.IO triggered actions
     _currentContext = context;
     
-    final streamUrl = AppConfig.mjpegStreamUrl;
+    // final streamUrl = AppConfig.mjpegStreamUrl;
     // final streamUrl = AppConfig.altCamUrl;
-    // final streamUrl = AppConfig.videoFeedUrl;
+    final streamUrl = AppConfig.videoFeedUrl;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -871,7 +1193,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
             right: 0,
             child: Column(
               children: [
-                // Photo mode indicator
+                // Photo/Video mode indicator
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -881,12 +1203,14 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
+                        color: _isRecording 
+                            ? Colors.red.withOpacity(0.8)
+                            : Colors.black.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'Photo Mode',
-                        style: TextStyle(
+                      child: Text(
+                        _isRecording ? 'Video Mode' : 'Photo Mode',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -993,6 +1317,30 @@ class _PiCameraScreenState extends State<PiCameraScreen>
                       ),
                     ),
                     const SizedBox(width: 30),
+                    // Record button
+                    GestureDetector(
+                      onTap: isControlsDisabled ? null : _toggleRecording,
+                      child: Container(
+                        width: 45,
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: _isRecording
+                              ? Colors.red
+                              : Colors.grey.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                          border: _isRecording
+                              ? Border.all(color: Colors.white, width: 2)
+                              : null,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                          color: Colors.white,
+                          size: _isRecording ? 20 : 24,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 30),
                     // Menu/gallery button
                     GestureDetector(
                       onTap: _openGallery,
@@ -1023,6 +1371,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
               right: 20,
               child: GestureDetector(
                 onTap: () {
+                  _imagePreviewTimer?.cancel();
                   setState(() {
                     capturedImageBytes = null;
                   });
@@ -1042,10 +1391,120 @@ class _PiCameraScreenState extends State<PiCameraScreen>
               ),
             ),
 
+          // Add preview of captured video if available
+          if (capturedVideoBytes != null || _isFetchingVideo)
+            Positioned(
+              top: 100,
+              right: capturedImageBytes != null ? 130 : 20,
+              child: GestureDetector(
+                onTap: () {
+                  if (!_isFetchingVideo && capturedVideoBytes != null) {
+                    _togglePreviewVideoPlayback();
+                  }
+                },
+                onLongPress: () {
+                  if (!_isFetchingVideo) {
+                    _videoPreviewTimer?.cancel();
+                    _previewVideoController?.dispose();
+                    _previewVideoController = null;
+                    setState(() {
+                      capturedVideoBytes = null;
+                    });
+                  }
+                },
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _isFetchingVideo ? Colors.orange : Colors.red,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _isFetchingVideo
+                        ? Container(
+                            color: Colors.black.withOpacity(0.7),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.orange,
+                              ),
+                            ),
+                          )
+                        : _isVideoPlayerSupported && 
+                          _previewVideoController != null && 
+                          _previewVideoController!.value.isInitialized
+                            ? Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // Video player
+                                  AspectRatio(
+                                    aspectRatio: _previewVideoController!.value.aspectRatio,
+                                    child: VideoPlayer(_previewVideoController!),
+                                  ),
+                                  // Play/Pause overlay
+                                  Center(
+                                    child: Icon(
+                                      _isPreviewVideoPlaying 
+                                          ? Icons.pause_circle_filled 
+                                          : Icons.play_circle_filled,
+                                      color: Colors.white.withOpacity(0.9),
+                                      size: 40,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // Video thumbnail placeholder (fallback for unsupported platforms)
+                                  Container(
+                                    color: Colors.black.withOpacity(0.8),
+                                    child: const Icon(
+                                      Icons.videocam,
+                                      color: Colors.white,
+                                      size: 40,
+                                    ),
+                                  ),
+                                  // Play button overlay or "View in Gallery" indicator
+                                  Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.play_circle_filled,
+                                          color: Colors.white,
+                                          size: 40,
+                                        ),
+                                        if (!_isVideoPlayerSupported)
+                                          const Padding(
+                                            padding: EdgeInsets.only(top: 4),
+                                            child: Text(
+                                              'Gallery',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                  ),
+                ),
+              ),
+            ),
+
           // Socket.IO Connection Status Indicator
           Positioned(
             top: 100,
-            right: 20,
+            right: (capturedImageBytes != null || capturedVideoBytes != null || _isFetchingVideo) 
+                ? 240 
+                : 20,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(

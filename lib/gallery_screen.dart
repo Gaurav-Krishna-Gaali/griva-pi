@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:video_player/video_player.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'services/pdf_service.dart';
 import 'services/patient_service.dart';
 import 'services/image_service.dart';
@@ -15,16 +18,22 @@ import 'config/app_config.dart';
 
 class GalleryScreen extends StatefulWidget {
   final List<Uint8List> images;
+  final List<Uint8List>? videos;
   final Function(int)? onDelete;
+  final Function(int)? onDeleteVideo;
   final List<Map<String, dynamic>>? unlinkedImages; // Cached images with metadata
+  final List<Map<String, dynamic>>? unlinkedVideos; // Cached videos with metadata
   final bool pickerMode; // When true, return selected images to caller
   final String? pickerActionLabel;
 
   const GalleryScreen({
     Key? key,
     required this.images,
+    this.videos,
     this.onDelete,
+    this.onDeleteVideo,
     this.unlinkedImages,
+    this.unlinkedVideos,
     this.pickerMode = false,
     this.pickerActionLabel,
   }) : super(key: key);
@@ -35,17 +44,34 @@ class GalleryScreen extends StatefulWidget {
 
 class _GalleryScreenState extends State<GalleryScreen> {
   late List<Uint8List> _images;
+  late List<Uint8List> _videos;
   Set<int> _selectedIndices = {};
+  Set<int> _selectedVideoIndices = {};
   bool _isSelectionMode = false;
   final PatientService _patientService = PatientService();
   List<Map<String, dynamic>> _unlinkedImages = [];
+  List<Map<String, dynamic>> _unlinkedVideos = [];
   bool _isAiProcessing = false;
+  Map<int, VideoPlayerController> _videoControllers = {};
+  Map<int, bool> _videoPlayingStates = {};
 
   @override
   void initState() {
     super.initState();
     _images = List.from(widget.images);
+    _videos = List.from(widget.videos ?? []);
     _unlinkedImages = List.from(widget.unlinkedImages ?? []);
+    _unlinkedVideos = List.from(widget.unlinkedVideos ?? []);
+  }
+
+  @override
+  void dispose() {
+    // Dispose all video controllers
+    for (var controller in _videoControllers.values) {
+      controller.dispose();
+    }
+    _videoControllers.clear();
+    super.dispose();
   }
 
   @override
@@ -67,6 +93,112 @@ class _GalleryScreenState extends State<GalleryScreen> {
     });
     if (widget.onDelete != null) {
       widget.onDelete!(index);
+    }
+  }
+
+  void _deleteVideo(int index) {
+    // Dispose video controller if exists
+    if (_videoControllers.containsKey(index)) {
+      _videoControllers[index]!.dispose();
+      _videoControllers.remove(index);
+      _videoPlayingStates.remove(index);
+    }
+    
+    setState(() {
+      _videos.removeAt(index);
+      _selectedVideoIndices.remove(index);
+      // Adjust indices for selected items after deletion
+      _selectedVideoIndices = _selectedVideoIndices.map((i) => i > index ? i - 1 : i).toSet();
+      
+      // Rebuild video controllers map
+      final newControllers = <int, VideoPlayerController>{};
+      final newPlayingStates = <int, bool>{};
+      for (var i = 0; i < _videos.length; i++) {
+        if (i < index && _videoControllers.containsKey(i)) {
+          newControllers[i] = _videoControllers[i]!;
+          newPlayingStates[i] = _videoPlayingStates[i] ?? false;
+        } else if (i >= index && _videoControllers.containsKey(i + 1)) {
+          newControllers[i] = _videoControllers[i + 1]!;
+          newPlayingStates[i] = _videoPlayingStates[i + 1] ?? false;
+        }
+      }
+      _videoControllers = newControllers;
+      _videoPlayingStates = newPlayingStates;
+    });
+    
+    if (widget.onDeleteVideo != null) {
+      widget.onDeleteVideo!(index);
+    }
+  }
+
+  Future<void> _initializeVideoPlayer(int index) async {
+    if (_videoControllers.containsKey(index)) {
+      return; // Already initialized
+    }
+
+    try {
+      // Check if platform supports video player
+      // video_player doesn't support Windows/Linux/Web well
+      if (Platform.isWindows || Platform.isLinux) {
+        print('Video player not fully supported on this platform. Showing fallback UI.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video playback not available on this platform'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Save video bytes to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final videoFile = File(path.join(tempDir.path, 'video_$index.mp4'));
+      await videoFile.writeAsBytes(_videos[index]);
+
+      // Create video player controller
+      final controller = VideoPlayerController.file(videoFile);
+      await controller.initialize();
+      
+      controller.addListener(() {
+        if (mounted) {
+          setState(() {
+            _videoPlayingStates[index] = controller.value.isPlaying;
+          });
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          _videoControllers[index] = controller;
+          _videoPlayingStates[index] = false;
+        });
+      }
+    } catch (e) {
+      print('Error initializing video player: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Video playback not available: ${e.toString()}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _toggleVideoPlayback(int index) {
+    if (!_videoControllers.containsKey(index)) {
+      _initializeVideoPlayer(index);
+      return;
+    }
+
+    final controller = _videoControllers[index]!;
+    if (controller.value.isPlaying) {
+      controller.pause();
+    } else {
+      controller.play();
     }
   }
 
@@ -755,6 +887,54 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
+  Widget _buildVideoThumbnail(int index) {
+    if (_videoControllers.containsKey(index) && 
+        _videoControllers[index]!.value.isInitialized) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          AspectRatio(
+            aspectRatio: _videoControllers[index]!.value.aspectRatio,
+            child: VideoPlayer(_videoControllers[index]!),
+          ),
+          Center(
+            child: IconButton(
+              icon: Icon(
+                _videoPlayingStates[index] == true 
+                    ? Icons.pause_circle_filled 
+                    : Icons.play_circle_filled,
+                color: Colors.white,
+                size: 40,
+              ),
+              onPressed: () => _toggleVideoPlayback(index),
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            color: Colors.black,
+            child: const Icon(
+              Icons.videocam,
+              color: Colors.white54,
+              size: 30,
+            ),
+          ),
+          const Center(
+            child: Icon(
+              Icons.play_circle_filled,
+              color: Colors.white,
+              size: 40,
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
   String _getPlatformInfo() {
     if (Platform.isWindows) return 'Windows';
     if (Platform.isLinux) return 'Linux';
@@ -990,7 +1170,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       ),
                     ),
                   
-                  // Image grid
+                  // Combined grid for images and videos
                   Expanded(
                     child: GridView.builder(
                       padding: const EdgeInsets.all(16),
@@ -1000,89 +1180,183 @@ class _GalleryScreenState extends State<GalleryScreen> {
                         mainAxisSpacing: 8,
                         childAspectRatio: 0.7,
                       ),
-                      itemCount: _images.length,
+                      itemCount: _images.length + _videos.length,
                       itemBuilder: (context, index) {
-                        final isSelected = _selectedIndices.contains(index);
-                        return GestureDetector(
-                          onTap: () {
-                            if (_isSelectionMode) {
-                              _toggleImageSelection(index);
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ImageDetailScreen(
-                                    imageBytes: _images[index],
-                                    onDelete: () {
-                                      _deleteImage(index);
-                                      Navigator.pop(context);
-                                    },
+                        // Determine if this is an image or video
+                        final isImage = index < _images.length;
+                        final itemIndex = isImage ? index : index - _images.length;
+                        
+                        if (isImage) {
+                          final isSelected = _selectedIndices.contains(itemIndex);
+                          return GestureDetector(
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                _toggleImageSelection(itemIndex);
+                              } else {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ImageDetailScreen(
+                                      imageBytes: _images[itemIndex],
+                                      onDelete: () {
+                                        _deleteImage(itemIndex);
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            onLongPress: () {
+                              if (!_isSelectionMode) {
+                                _toggleSelectionMode();
+                                _toggleImageSelection(itemIndex);
+                              }
+                            },
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: isSelected ? const Color(0xFF6B46C1) : Colors.grey.shade300,
+                                            width: isSelected ? 2 : 1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.memory(
+                                            _images[itemIndex],
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF6B46C1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                              );
-                            }
-                          },
-                          onLongPress: () {
-                            if (!_isSelectionMode) {
-                              _toggleSelectionMode();
-                              _toggleImageSelection(index);
-                            }
-                          },
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: isSelected ? const Color(0xFF6B46C1) : Colors.grey.shade300,
-                                          width: isSelected ? 2 : 1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.memory(
-                                          _images[index],
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                        ),
-                                      ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Image ${itemIndex + 1}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          // Video item
+                          final isSelected = _selectedVideoIndices.contains(itemIndex);
+                          return GestureDetector(
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                setState(() {
+                                  if (_selectedVideoIndices.contains(itemIndex)) {
+                                    _selectedVideoIndices.remove(itemIndex);
+                                  } else {
+                                    _selectedVideoIndices.add(itemIndex);
+                                  }
+                                });
+                              } else {
+                                // Show video detail screen
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => VideoDetailScreen(
+                                      videoBytes: _videos[itemIndex],
+                                      onDelete: () {
+                                        _deleteVideo(itemIndex);
+                                        Navigator.pop(context);
+                                      },
                                     ),
-                                    if (isSelected)
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Container(
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFF6B46C1),
-                                            shape: BoxShape.circle,
+                                  ),
+                                );
+                              }
+                            },
+                            onLongPress: () {
+                              if (!_isSelectionMode) {
+                                _toggleSelectionMode();
+                                setState(() {
+                                  _selectedVideoIndices.add(itemIndex);
+                                });
+                              }
+                            },
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: isSelected ? Colors.red : Colors.grey.shade300,
+                                            width: isSelected ? 2 : 1,
                                           ),
-                                          child: const Icon(
-                                            Icons.check,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Colors.black,
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: _buildVideoThumbnail(itemIndex),
                                         ),
                                       ),
-                                  ],
+                                      if (isSelected)
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Cervix Image ${index + 1}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w500,
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Video ${itemIndex + 1}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        );
+                              ],
+                            ),
+                          );
+                        }
                       },
                     ),
                   ),
@@ -1274,6 +1548,217 @@ class ImageDetailScreen extends StatelessWidget {
           fit: BoxFit.contain,
         ),
       ),
+    );
+  }
+}
+
+class VideoDetailScreen extends StatefulWidget {
+  final Uint8List videoBytes;
+  final VoidCallback onDelete;
+
+  const VideoDetailScreen({
+    Key? key,
+    required this.videoBytes,
+    required this.onDelete,
+  }) : super(key: key);
+
+  @override
+  State<VideoDetailScreen> createState() => _VideoDetailScreenState();
+}
+
+class _VideoDetailScreenState extends State<VideoDetailScreen> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _isPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      // Check if platform supports video player
+      // video_player doesn't support Windows/Linux/Web well
+      if (Platform.isWindows || Platform.isLinux) {
+        print('Video player not fully supported on this platform.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video playback not available on this platform. Video file is saved.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Save video bytes to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final videoFile = File(path.join(tempDir.path, 'video_detail_${DateTime.now().millisecondsSinceEpoch}.mp4'));
+      await videoFile.writeAsBytes(widget.videoBytes);
+
+      // Create video player controller
+      _controller = VideoPlayerController.file(videoFile);
+      await _controller!.initialize();
+      
+      _controller!.addListener(() {
+        if (mounted) {
+          setState(() {
+            _isPlaying = _controller!.value.isPlaying;
+          });
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      print('Error initializing video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Video playback not available: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _togglePlayPause() {
+    if (_controller == null || !_isInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video playback not available on this platform'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    setState(() {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+      } else {
+        _controller!.play();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Colors.grey[900],
+                  title: const Text(
+                    'Delete Video',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  content: const Text(
+                    'Are you sure you want to delete this video?',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close dialog
+                        widget.onDelete();
+                      },
+                      child: const Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: _isInitialized && _controller != null
+            ? Stack(
+                alignment: Alignment.center,
+                children: [
+                  AspectRatio(
+                    aspectRatio: _controller!.value.aspectRatio,
+                    child: VideoPlayer(_controller!),
+                  ),
+                  // Play/Pause overlay
+                  GestureDetector(
+                    onTap: _togglePlayPause,
+                    child: Container(
+                      color: Colors.transparent,
+                      child: Icon(
+                        _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        color: Colors.white.withOpacity(0.8),
+                        size: 80,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Platform.isWindows || Platform.isLinux
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.videocam,
+                        color: Colors.white54,
+                        size: 80,
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Video playback not available',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Video file is saved and can be viewed\non supported platforms',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                  )
+                : const CircularProgressIndicator(
+                    color: Colors.white,
+                  ),
+      ),
+      floatingActionButton: _isInitialized && _controller != null
+          ? FloatingActionButton(
+              onPressed: _togglePlayPause,
+              backgroundColor: Colors.white.withOpacity(0.8),
+              child: Icon(
+                _isPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.black,
+              ),
+            )
+          : null,
     );
   }
 } 
