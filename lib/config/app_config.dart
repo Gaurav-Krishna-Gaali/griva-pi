@@ -14,6 +14,7 @@ class AppConfig {
   static String get captureUrl => '$baseUrl/capture';
   static String get recordingStartUrl => '$baseUrl/recording/start';
   static String get recordingStopUrl => '$baseUrl/recording/stop';
+  static String get recordingVideoUrl => '$baseUrl/recording/video';
 
   // Streaming endpoints (choose one as needed)
   static String get mjpegStreamUrl => 'http://$baseHost:$httpPort/?action=stream';

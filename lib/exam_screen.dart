@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:video_player/video_player.dart';
+// video_player_win is automatically used on Windows when both packages are in pubspec.yaml
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
@@ -356,6 +357,7 @@ class _PiCameraScreenState extends State<PiCameraScreen>
   }
 
   void _openGallery() {
+    print('Opening gallery with ${capturedImages.length} images and ${capturedVideos.length} videos');
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -573,9 +575,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
       _previewVideoController = null;
       
       // Check if platform supports video player
-      // video_player doesn't support Windows/Linux/Web well
-      if (Platform.isWindows || Platform.isLinux) {
-        print('Video player not fully supported on this platform. Showing fallback UI.');
+      // video_player_win provides Windows support
+      if (Platform.isLinux) {
+        print('Video player not fully supported on Linux. Showing fallback UI.');
         _isVideoPlayerSupported = false;
         if (mounted) {
           setState(() {});

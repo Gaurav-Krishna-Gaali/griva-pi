@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:video_player/video_player.dart';
+// video_player_win is automatically used on Windows when both packages are in pubspec.yaml
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'services/pdf_service.dart';
@@ -62,6 +63,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     _videos = List.from(widget.videos ?? []);
     _unlinkedImages = List.from(widget.unlinkedImages ?? []);
     _unlinkedVideos = List.from(widget.unlinkedVideos ?? []);
+    print('Gallery initialized with ${_images.length} images and ${_videos.length} videos');
   }
 
   @override
@@ -138,13 +140,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
     try {
       // Check if platform supports video player
-      // video_player doesn't support Windows/Linux/Web well
-      if (Platform.isWindows || Platform.isLinux) {
-        print('Video player not fully supported on this platform. Showing fallback UI.');
+      // video_player_win provides Windows support
+      if (Platform.isLinux) {
+        print('Video player not fully supported on Linux. Showing fallback UI.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Video playback not available on this platform'),
+              content: Text('Video playback not available on Linux'),
               duration: Duration(seconds: 2),
             ),
           );
@@ -996,11 +998,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
           ),
           
           // Main content
-          if (_images.isEmpty)
+          if (_images.isEmpty && _videos.isEmpty)
             const Expanded(
               child: Center(
                 child: Text(
-                  'No images captured yet',
+                  'No images or videos captured yet',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -1055,9 +1057,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       children: [
                         Row(
                           children: [
-                            const Text(
-                              'Review and edit captured Images',
-                              style: TextStyle(
+                            Text(
+                              'Review and edit captured ${_images.isNotEmpty && _videos.isNotEmpty ? "Media" : _images.isNotEmpty ? "Images" : "Videos"}',
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
                                 color: Colors.black87,
@@ -1065,7 +1067,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              '${_selectedIndices.length}/${_images.length} Selected for Report',
+                              '${_selectedIndices.length + _selectedVideoIndices.length}/${_images.length + _videos.length} Selected for Report',
                               style: const TextStyle(
                                 color: Color(0xFF6B46C1), // Purple color
                                 fontWeight: FontWeight.w500,
@@ -1580,13 +1582,13 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   Future<void> _initializeVideo() async {
     try {
       // Check if platform supports video player
-      // video_player doesn't support Windows/Linux/Web well
-      if (Platform.isWindows || Platform.isLinux) {
-        print('Video player not fully supported on this platform.');
+      // video_player_win provides Windows support
+      if (Platform.isLinux) {
+        print('Video player not fully supported on Linux.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Video playback not available on this platform. Video file is saved.'),
+              content: Text('Video playback not available on Linux. Video file is saved.'),
               duration: Duration(seconds: 3),
             ),
           );
@@ -1723,7 +1725,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                   ),
                 ],
               )
-            : Platform.isWindows || Platform.isLinux
+                : Platform.isLinux
                 ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

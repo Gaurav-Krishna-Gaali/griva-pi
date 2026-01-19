@@ -19,6 +19,10 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   }
   
+  // video_player_win automatically provides Windows support when both
+  // video_player and video_player_win are in pubspec.yaml
+  // No explicit initialization needed - it works via plugin registration
+  
   runApp(const MyApp());
 }
 
