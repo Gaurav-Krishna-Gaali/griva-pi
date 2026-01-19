@@ -1,8 +1,8 @@
 class AppConfig {
   // Base IP/host for the camera/control server
   // static const String baseHost = '192.168.1.54';
-  static const String baseHost = '10.42.1.1';
-  // static const String baseHost = '127.0.0.1';
+  // static const String baseHost = '10.42.1.1';
+  static const String baseHost = '127.0.0.1';
   static const int httpPort = 5000;
 
   // Derived base URL
@@ -12,6 +12,8 @@ class AppConfig {
   static String ledStageUrl(int stage) => '$baseUrl/led?stage=$stage';
   static String greenFilterUrl(int level) => '$baseUrl/green?level=$level';
   static String get captureUrl => '$baseUrl/capture';
+  static String get recordingStartUrl => '$baseUrl/recording/start';
+  static String get recordingStopUrl => '$baseUrl/recording/stop';
 
   // Streaming endpoints (choose one as needed)
   static String get mjpegStreamUrl => 'http://$baseHost:$httpPort/?action=stream';
