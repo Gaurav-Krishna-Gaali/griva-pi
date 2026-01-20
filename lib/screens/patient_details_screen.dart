@@ -612,48 +612,20 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
           const SizedBox(height: 8),
           _buildVisitInfo('Follow-up', followUp),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Scroll to the images section for this patient
-                    final ctx = _imagesSectionKey.currentContext;
-                    if (ctx != null) {
-                      Scrollable.ensureVisible(
-                        ctx,
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeInOut,
-                      );
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF8B44F7)),
-                    foregroundColor: const Color(0xFF8B44F7),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: const Text('View Images'),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => _showReportsForPatient(),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF8B44F7)),
+                foregroundColor: const Color(0xFF8B44F7),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _showReportsForPatient(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF8B44F7)),
-                    foregroundColor: const Color(0xFF8B44F7),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: const Text('View Reports'),
-                ),
-              ),
-            ],
+              child: const Text('View Reports'),
+            ),
           ),
         ],
       ),
@@ -699,6 +671,10 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
 
         final finalImpression = (meta?['finalImpression'] as String?)?.trim();
         final chiefComplaint = (meta?['chiefComplaint'] as String?)?.trim();
+        final colposcopy =
+            (meta?['colposcopyFindings'] as String?)?.trim();
+        final treatment =
+            (meta?['treatmentProvided'] as String?)?.trim();
         final remarks = (meta?['remarks'] as String?)?.trim();
         final precautions = (meta?['precautions'] as String?)?.trim();
         final imageCount = (meta?['imageCount'] as num?)?.toInt();
@@ -748,6 +724,10 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
               const SizedBox(height: 10),
               if (finalImpression != null && finalImpression.isNotEmpty)
                 _buildVisitInfo('Impression', finalImpression),
+              if (colposcopy != null && colposcopy.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildVisitInfo('Colposcopy', colposcopy),
+              ],
               if (chiefComplaint != null && chiefComplaint.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 _buildVisitInfo('Complaint', chiefComplaint),
@@ -755,6 +735,10 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
               if (imageCount != null) ...[
                 const SizedBox(height: 6),
                 _buildVisitInfo('Images', '$imageCount'),
+              ],
+              if (treatment != null && treatment.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildVisitInfo('Treatment', treatment),
               ],
               if (remarks != null && remarks.isNotEmpty) ...[
                 const SizedBox(height: 6),
@@ -765,60 +749,32 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                 _buildVisitInfo('Follow-up', precautions),
               ],
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        // Scroll to the images section for this patient
-                        final ctx = _imagesSectionKey.currentContext;
-                        if (ctx != null) {
-                          Scrollable.ensureVisible(
-                            ctx,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF8B44F7)),
-                        foregroundColor: const Color(0xFF8B44F7),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ReportPdfViewerScreen(
+                          filePath: file.path,
+                          title: file.path
+                              .split(Platform.pathSeparator)
+                              .last,
                         ),
                       ),
-                      child: const Text('View Images'),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF8B44F7)),
+                    foregroundColor: const Color(0xFF8B44F7),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ReportPdfViewerScreen(
-                              filePath: file.path,
-                              title: file.path
-                                  .split(Platform.pathSeparator)
-                                  .last,
-                            ),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF8B44F7)),
-                        foregroundColor: const Color(0xFF8B44F7),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      child: const Text('View Report'),
-                    ),
-                  ),
-                ],
+                  child: const Text('View Report'),
+                ),
               ),
             ],
           ),
