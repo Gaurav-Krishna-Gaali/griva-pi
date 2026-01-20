@@ -1,11 +1,14 @@
 import 'dart:typed_data';
 import 'dart:io';
+
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/services.dart' show rootBundle;
+
 import 'patient_service.dart';
 
 class MedicalReportService {
@@ -129,6 +132,35 @@ class MedicalReportService {
     } catch (e) {
       throw Exception('Error creating comprehensive report: $e');
     }
+  }
+
+  /// List all comprehensive colposcopy reports generated for a given patient.
+  ///
+  /// This looks into the GrivaReports/Colposcopy folder and matches files whose
+  /// names start with the sanitized patient name that we use when saving.
+  static Future<List<File>> listReportsForPatient(Patient patient) async {
+    final pdfDirPath = await _getPdfDirectory();
+    final dir = Directory(pdfDirPath);
+    if (!await dir.exists()) {
+      return [];
+    }
+
+    final safePatientName =
+        patient.patientName.replaceAll(RegExp(r'[^\w\s-]'), '_');
+
+    final entities = await dir
+        .list()
+        .where((e) => e is File && e.path.toLowerCase().endsWith('.pdf'))
+        .toList();
+
+    return entities
+        .whereType<File>()
+        .where((file) {
+          final name = p.basename(file.path);
+          return name.startsWith('${safePatientName}_comprehensive_report_');
+        })
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
   }
   
   static pw.Widget _buildHeader() {

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
-import '../services/patient_service.dart';
-import 'patient_form_screen.dart';
-import '../new_patient_form.dart';
 import 'dart:io';
+import 'dart:typed_data';
+
+import '../services/patient_service.dart';
+import '../services/image_service.dart';
+import '../services/video_service.dart';
+import '../new_patient_form.dart';
 import '../widgets/centralized_footer.dart';
 import '../custom_app_bar.dart';
 import 'patient_details_screen.dart';
@@ -23,6 +26,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
   bool _isLoading = true;
   String? _error;
   Patient? _selectedPatient;
+  Future<List<String>>? _previewImagePathsFuture;
+  Future<List<String>>? _previewVideoPathsFuture;
 
   final TextEditingController _searchController = TextEditingController();
   String _timeFilter = 'All time';
@@ -66,54 +71,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     }
   }
 
-  Future<void> _navigateToEditPatient(Patient patient) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PatientFormScreen(patient: patient),
-      ),
-    );
-    if (result == true) {
-      _loadPatients();
-    }
-  }
-
-  Future<void> _deletePatient(Patient patient) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Patient'),
-        content: Text('Are you sure you want to delete ${patient.patientName}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _patientService.deletePatient(patient.id!);
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context, true);
-        } else {
-          _loadPatients();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting patient: $e')),
-          );
-        }
-      }
-    }
-  }
+  // Note: edit/delete actions are handled in the details screen and/or other flows.
 
   @override
   Widget build(BuildContext context) {
@@ -329,7 +287,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       result = result.where((p) {
         final name = p.patientName.toLowerCase();
         final id = (p.patientId ?? '').toString().toLowerCase();
-        final mobile = (p.mobileNo ?? '').toString().toLowerCase();
+        final mobile = p.mobileNo.toString().toLowerCase();
         return name.contains(query) || id.contains(query) || mobile.contains(query);
       });
     }
@@ -475,7 +433,20 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   final p = rows[index];
                   final isSelected = _selectedPatient?.id == p.id;
                   return InkWell(
-                    onTap: () => setState(() => _selectedPatient = p),
+                    onTap: () {
+                      setState(() {
+                        _selectedPatient = p;
+                        if (p.id == null) {
+                          _previewImagePathsFuture = Future.value(<String>[]);
+                          _previewVideoPathsFuture = Future.value(<String>[]);
+                        } else {
+                          _previewImagePathsFuture =
+                              ImageService.getPatientImages(p.id!);
+                          _previewVideoPathsFuture =
+                              VideoService.getPatientVideos(p.id!);
+                        }
+                      });
+                    },
                     child: Container(
                       color: isSelected ? const Color(0xFFF1F5FF) : Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -528,7 +499,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
     }
 
     final p = _selectedPatient!;
-        return Card(
+    _previewImagePathsFuture ??= (p.id == null)
+        ? Future.value(<String>[])
+        : ImageService.getPatientImages(p.id!);
+
+    return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade300)),
       child: Padding(
@@ -549,7 +524,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
               runSpacing: 8,
               children: [
                 if (p.patientId != null) Text('ID: ${p.patientId}'),
-                if (p.mobileNo != null) Text('Mobile: ${p.mobileNo}'),
+                if (p.mobileNo.toString().trim().isNotEmpty) Text('Mobile: ${p.mobileNo}'),
                 if (p.dateOfVisit != null) Text('Visit: ${p.dateOfVisit!.toLocal().toString().split(' ')[0]}'),
               ],
             ),
@@ -560,8 +535,79 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   color: Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Center(
-                  child: Icon(Icons.photo_library_outlined, size: 64, color: Colors.deepPurple),
+                child: FutureBuilder<List<String>>(
+                  future: _previewImagePathsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final paths = snapshot.data ?? const <String>[];
+                    if (paths.isEmpty) {
+                      return const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.photo_library_outlined,
+                              size: 64,
+                              color: Colors.deepPurple,
+                            ),
+                            SizedBox(height: 8),
+                            Text('No examination images yet'),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Show the most recent images first (limit for performance).
+                    final recent = paths.reversed.take(4).toList();
+
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: GridView.builder(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: recent.length,
+                        itemBuilder: (context, index) {
+                          final imagePath = recent[index];
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: FutureBuilder<Uint8List?>(
+                              future: ImageService.loadImage(imagePath),
+                              builder: (context, imgSnap) {
+                                if (imgSnap.connectionState == ConnectionState.waiting) {
+                                  return Container(
+                                    color: Colors.white,
+                                    child: const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  );
+                                }
+                                if (imgSnap.hasError || imgSnap.data == null) {
+                                  return Container(
+                                    color: Colors.white,
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, color: Colors.deepPurple),
+                                    ),
+                                  );
+                                }
+                                return Image.memory(
+                                  imgSnap.data!,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -621,7 +667,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       for (final p in _applyFilters(_patients)) {
         final date = p.dateOfVisit?.toIso8601String() ?? '';
         final id = p.patientId?.toString() ?? '';
-        final mobile = p.mobileNo?.toString() ?? '';
+        final mobile = p.mobileNo.toString();
         buffer.writeln('"${p.patientName}","$id","$mobile","$date"');
       }
 

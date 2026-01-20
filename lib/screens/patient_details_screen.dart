@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
+import 'dart:io';
+
 import '../custom_app_bar.dart';
 import '../widgets/centralized_footer.dart';
 import '../services/patient_service.dart';
 import '../services/image_service.dart';
+import '../services/medical_report_service.dart';
+import '../services/video_service.dart';
+import '../gallery_screen.dart';
 import '../new_patient_form.dart';
 
 class PatientDetailsScreen extends StatefulWidget {
   final Patient patient;
 
-  const PatientDetailsScreen({Key? key, required this.patient}) : super(key: key);
+  const PatientDetailsScreen({Key? key, required this.patient})
+      : super(key: key);
 
   @override
   State<PatientDetailsScreen> createState() => _PatientDetailsScreenState();
@@ -20,12 +26,16 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   late Patient _patient;
   List<String> _examinationImages = [];
   bool _isLoadingImages = true;
+  List<String> _examinationVideos = [];
+  bool _isLoadingVideos = true;
+  final GlobalKey _imagesSectionKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _patient = widget.patient;
     _loadExaminationImages();
+    _loadExaminationVideos();
   }
 
   Future<void> _loadExaminationImages() async {
@@ -42,6 +52,21 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
       });
     }
   }
+
+  Future<void> _loadExaminationVideos() async {
+    try {
+      final videos = await VideoService.getPatientVideos(_patient.id!);
+      setState(() {
+        _examinationVideos = videos;
+        _isLoadingVideos = false;
+      });
+    } catch (e) {
+      print('Error loading examination videos: $e');
+      setState(() {
+        _isLoadingVideos = false;
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,16 +78,27 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Patient Details Header
-              const Center(
-                child: Text(
-                  'Patient Details',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+              // Patient Details Header with Back Button
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.maybePop(context),
                   ),
-                ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Patient Details',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
               ),
               const SizedBox(height: 24),
 
@@ -221,7 +257,8 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.favorite, color: Color(0xFF8B44F7), size: 20),
+                              const Icon(Icons.favorite,
+                                  color: Color(0xFF8B44F7), size: 20),
                               const SizedBox(width: 8),
                               const Text(
                                 'Cervical Health Information',
@@ -234,19 +271,39 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _buildHealthInfo('Primary Condition', 'Colposcopy Follow-up', isHighlighted: true),
+                          _buildHealthInfo(
+                            'Primary Condition',
+                            _patient.referralReason ??
+                                _patient.finalImpression ??
+                                'Not recorded',
+                            isHighlighted: true,
+                          ),
                           const SizedBox(height: 12),
-                          _buildHealthInfo('Total Visits', '2'),
+                          _buildHealthInfo(
+                            'Latest Visit',
+                            _formatDate(_patient.dateOfVisit),
+                          ),
                           const SizedBox(height: 12),
-                          _buildHealthInfo('Latest Visit', _formatDate(_patient.dateOfVisit)),
+                          _buildHealthInfo(
+                            'Chief Complaint',
+                            _patient.chiefComplaint ?? 'Not recorded',
+                          ),
                           const SizedBox(height: 12),
-                          _buildHealthInfo('Next Follow-up', '05/08/2025'),
+                          _buildHealthInfo(
+                            'Colposcopy Findings',
+                            _patient.colposcopyFindings ?? 'Not recorded',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildHealthInfo(
+                            'Final Impression',
+                            _patient.finalImpression ?? 'Not recorded',
+                          ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
-                  // Examination Images
+                  // Examination Images & Videos
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(20),
@@ -265,9 +322,12 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Images header
                           Row(
+                            key: _imagesSectionKey,
                             children: [
-                              const Icon(Icons.photo_camera, color: Color(0xFF8B44F7), size: 20),
+                              const Icon(Icons.photo_camera,
+                                  color: Color(0xFF8B44F7), size: 20),
                               const SizedBox(width: 8),
                               const Text(
                                 'Examination Images',
@@ -290,6 +350,34 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                           ),
                           const SizedBox(height: 16),
                           _buildExaminationImagesGrid(),
+                          const SizedBox(height: 20),
+                          // Videos header
+                          Row(
+                            children: [
+                              const Icon(Icons.videocam,
+                                  color: Color(0xFF8B44F7), size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Examination Videos',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${_examinationVideos.length}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF8B44F7),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildExaminationVideosList(),
                         ],
                       ),
                     ),
@@ -321,21 +409,15 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                 children: [
                   Expanded(
                     child: _buildVisitCard(
-                      'Colposcopy Examination (Visit #1)',
-                      '15/01/2024',
-                      'Cervical Dysplasia - Grade 2',
-                      'Visible acetowhite changes in transformation zone.',
-                      'Schedule biopsy in 2 weeks',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildVisitCard(
-                      'Initial Check-up (Visit #2)',
-                      '16/01/2024',
-                      'HPV Positive - High Risk',
-                      'HPV 16/18 detected. Patient counseled on treatment options.',
-                      'Schedule biopsy in 2 weeks',
+                      _patient.dateOfVisit != null
+                          ? 'Colposcopy Examination'
+                          : 'Visit Details',
+                      _formatDate(_patient.dateOfVisit),
+                      _patient.finalImpression ??
+                          _patient.colposcopyFindings ??
+                          'Not recorded',
+                      _patient.remarks ?? 'No additional notes recorded',
+                      _patient.precautions ?? 'Follow-up not specified',
                     ),
                   ),
                 ],
@@ -347,58 +429,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
         ),
       ),
       bottomNavigationBar: const CentralizedFooter(),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFF8B44F7), size: 20),
-        const SizedBox(width: 12),
-        Text(
-          '$label: ',
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF6B7280),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF1F2937),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCompactInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFF8B44F7), size: 16),
-        const SizedBox(width: 8),
-        if (label.isNotEmpty) ...[
-          Text(
-            '$label: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
-              fontSize: 14,
-            ),
-          ),
-        ],
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF1F2937),
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -499,15 +529,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     }
   }
 
-  Widget _dot() => Container(
-        width: 4,
-        height: 4,
-        decoration: BoxDecoration(
-          color: const Color(0xFFD1D5DB),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
-
   Widget _buildHealthInfo(String label, String value, {bool isHighlighted = false}) {
     return Row(
       children: [
@@ -544,30 +565,8 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     );
   }
 
-  Widget _buildClinicalNote(String date, String note) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          date,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF8B44F7),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          note,
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVisitCard(String title, String date, String diagnosis, String notes, String followUp) {
+  Widget _buildVisitCard(String title, String date, String diagnosis,
+      String notes, String followUp) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -606,7 +605,17 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Scroll to the images section for this patient
+                    final ctx = _imagesSectionKey.currentContext;
+                    if (ctx != null) {
+                      Scrollable.ensureVisible(
+                        ctx,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF8B44F7)),
                     foregroundColor: const Color(0xFF8B44F7),
@@ -621,7 +630,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () => _showReportsForPatient(),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF8B44F7)),
                     foregroundColor: const Color(0xFF8B44F7),
@@ -682,6 +691,111 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Future<void> _showReportsForPatient() async {
+    try {
+      final reports =
+          await MedicalReportService.listReportsForPatient(_patient);
+
+      if (!mounted) return;
+
+      if (reports.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No reports found for this patient'),
+          ),
+        );
+        return;
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (context) {
+          return SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf,
+                          color: Color(0xFF8B44F7)),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Patient Reports',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${reports.length}',
+                        style: const TextStyle(
+                          color: Color(0xFF8B44F7),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: reports.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final file = reports[index];
+                        final name = file.path.split(Platform.pathSeparator).last;
+                        return ListTile(
+                          leading: const Icon(Icons.picture_as_pdf,
+                              color: Colors.redAccent),
+                          title: Text(
+                            name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            try {
+                              await MedicalReportService.openReport(
+                                  file.path);
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Failed to open report: $e',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load reports: $e'),
+        ),
+      );
+    }
   }
 
   Widget _buildExaminationImagesGrid() {
@@ -891,6 +1005,122 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildExaminationVideosList() {
+    if (_isLoadingVideos) {
+      return const SizedBox(
+        height: 60,
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B44F7)),
+          ),
+        ),
+      );
+    }
+
+    if (_examinationVideos.isEmpty) {
+      return Container(
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.grey.withOpacity(0.3),
+          ),
+        ),
+        child: const Center(
+          child: Text(
+            'No examination videos',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 140,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _examinationVideos.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final videoPath = _examinationVideos[index];
+          final name = videoPath.split(Platform.pathSeparator).last;
+          return GestureDetector(
+            onTap: () async {
+              final bytes = await VideoService.loadVideo(videoPath);
+              if (!mounted) return;
+
+              if (bytes == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to load video file'),
+                  ),
+                );
+                return;
+              }
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => VideoDetailScreen(
+                    videoBytes: bytes,
+                    onDelete: () async {
+                      final file = File(videoPath);
+                      if (await file.exists()) {
+                        await file.delete();
+                      }
+                      if (!mounted) return;
+                      setState(() {
+                        _examinationVideos.removeAt(index);
+                      });
+                    },
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              width: 180,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF8B44F7).withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.play_circle_fill,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(
+                      name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
