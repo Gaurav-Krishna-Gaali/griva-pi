@@ -10,6 +10,7 @@ import '../services/medical_report_service.dart';
 import '../services/video_service.dart';
 import '../gallery_screen.dart';
 import '../new_patient_form.dart';
+import 'report_pdf_viewer_screen.dart';
 
 class PatientDetailsScreen extends StatefulWidget {
   final Patient patient;
@@ -764,19 +765,16 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                           ),
                           onTap: () async {
                             Navigator.pop(context);
-                            try {
-                              await MedicalReportService.openReport(
-                                  file.path);
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Failed to open report: $e',
-                                  ),
+                            if (!mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ReportPdfViewerScreen(
+                                  filePath: file.path,
+                                  title: name,
                                 ),
-                              );
-                            }
+                              ),
+                            );
                           },
                         );
                       },
