@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -28,6 +29,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Patient? _selectedPatient;
   Future<List<String>>? _previewImagePathsFuture;
   Future<List<String>>? _previewVideoPathsFuture;
+  final Map<int, VideoPlayerController> _previewVideoControllers = {};
 
   final TextEditingController _searchController = TextEditingController();
   String _timeFilter = 'All time';
@@ -37,6 +39,13 @@ class _PatientListScreenState extends State<PatientListScreen> {
   void initState() {
     super.initState();
     _loadPatients();
+  }
+
+  @override
+  void dispose() {
+    _disposePreviewVideoControllers();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPatients() async {
@@ -56,6 +65,88 @@ class _PatientListScreenState extends State<PatientListScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  void _disposePreviewVideoControllers() {
+    for (final controller in _previewVideoControllers.values) {
+      controller.dispose();
+    }
+    _previewVideoControllers.clear();
+  }
+
+  Widget _buildStaticVideoTile({bool isLoading = false}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.deepPurple.withOpacity(0.3),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: isLoading
+                ? const CircularProgressIndicator(strokeWidth: 2)
+                : const Icon(
+                    Icons.videocam,
+                    color: Colors.deepPurple,
+                    size: 36,
+                  ),
+          ),
+          Positioned(
+            top: 6,
+            left: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'VID',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _initializePreviewVideoController(
+    int index,
+    String videoPath,
+  ) async {
+    if (_previewVideoControllers.containsKey(index)) return;
+
+    try {
+      if (Platform.isLinux) {
+        // No video playback thumbnails on Linux; rely on static icon.
+        return;
+      }
+
+      final controller = VideoPlayerController.file(File(videoPath));
+      await controller.initialize();
+      controller.setLooping(true);
+      await controller.play();
+
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      setState(() {
+        _previewVideoControllers[index] = controller;
+      });
+    } catch (e) {
+      // Fallback to static icon if anything fails.
+      debugPrint('Error initializing preview video controller: $e');
     }
   }
 
@@ -435,6 +526,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   return InkWell(
                     onTap: () {
                       setState(() {
+                        _disposePreviewVideoControllers();
                         _selectedPatient = p;
                         if (p.id == null) {
                           _previewImagePathsFuture = Future.value(<String>[]);
@@ -502,6 +594,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
     _previewImagePathsFuture ??= (p.id == null)
         ? Future.value(<String>[])
         : ImageService.getPatientImages(p.id!);
+    _previewVideoPathsFuture ??= (p.id == null)
+        ? Future.value(<String>[])
+        : VideoService.getPatientVideos(p.id!);
 
     return Card(
       elevation: 0,
@@ -535,73 +630,173 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   color: Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: FutureBuilder<List<String>>(
-                  future: _previewImagePathsFuture,
+                child: FutureBuilder<List<List<String>>>(
+                  future: Future.wait<List<String>>([
+                    _previewImagePathsFuture ?? Future.value(<String>[]),
+                    _previewVideoPathsFuture ?? Future.value(<String>[]),
+                  ]),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    final paths = snapshot.data ?? const <String>[];
-                    if (paths.isEmpty) {
+                    final images = (snapshot.data != null && snapshot.data!.isNotEmpty)
+                        ? snapshot.data![0]
+                        : const <String>[];
+                    final videos = (snapshot.data != null && snapshot.data!.length > 1)
+                        ? snapshot.data![1]
+                        : const <String>[];
+
+                    // Combine most-recent-first, capped for performance.
+                    final recentImages = images.reversed.take(4).toList();
+                    final recentVideos = videos.reversed.take(3).toList();
+                    final total = recentImages.length + recentVideos.length;
+
+                    if (total == 0) {
                       return const Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.photo_library_outlined,
+                              Icons.perm_media_outlined,
                               size: 64,
                               color: Colors.deepPurple,
                             ),
                             SizedBox(height: 8),
-                            Text('No examination images yet'),
+                            Text('No examination media yet'),
                           ],
                         ),
                       );
                     }
 
-                    // Show the most recent images first (limit for performance).
-                    final recent = paths.reversed.take(4).toList();
-
                     return Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: GridView.builder(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                         ),
-                        itemCount: recent.length,
+                        itemCount: total,
                         itemBuilder: (context, index) {
-                          final imagePath = recent[index];
+                          final isImage = index < recentImages.length;
+                          if (isImage) {
+                            final imagePath = recentImages[index];
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: FutureBuilder<Uint8List?>(
+                                future: ImageService.loadImage(imagePath),
+                                builder: (context, imgSnap) {
+                                  if (imgSnap.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Container(
+                                      color: Colors.white,
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      ),
+                                    );
+                                  }
+                                  if (imgSnap.hasError || imgSnap.data == null) {
+                                    return Container(
+                                      color: Colors.white,
+                                      child: const Center(
+                                        child: Icon(Icons.broken_image,
+                                            color: Colors.deepPurple),
+                                      ),
+                                    );
+                                  }
+                                  return Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.memory(
+                                        imgSnap.data!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned(
+                                        top: 6,
+                                        left: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.deepPurple,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: const Text(
+                                            'IMG',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            );
+                          }
+
+                          // Video tile with motion thumbnail when supported.
+                          final videoIndex = index - recentImages.length;
+                          final videoPath = recentVideos[videoIndex];
+
+                          // For Linux or if something goes wrong, show static fallback.
+                          if (Platform.isLinux) {
+                            return _buildStaticVideoTile();
+                          }
+
+                          _initializePreviewVideoController(
+                            videoIndex,
+                            videoPath,
+                          );
+
+                          final controller =
+                              _previewVideoControllers[videoIndex];
+                          if (controller == null ||
+                              !controller.value.isInitialized) {
+                            return _buildStaticVideoTile(isLoading: true);
+                          }
+
                           return ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: FutureBuilder<Uint8List?>(
-                              future: ImageService.loadImage(imagePath),
-                              builder: (context, imgSnap) {
-                                if (imgSnap.connectionState == ConnectionState.waiting) {
-                                  return Container(
-                                    color: Colors.white,
-                                    child: const Center(
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  );
-                                }
-                                if (imgSnap.hasError || imgSnap.data == null) {
-                                  return Container(
-                                    color: Colors.white,
-                                    child: const Center(
-                                      child: Icon(Icons.broken_image, color: Colors.deepPurple),
-                                    ),
-                                  );
-                                }
-                                return Image.memory(
-                                  imgSnap.data!,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                FittedBox(
                                   fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                );
-                              },
+                                  child: SizedBox(
+                                    width: controller.value.size.width,
+                                    height: controller.value.size.height,
+                                    child: VideoPlayer(controller),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 6,
+                                  left: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Text(
+                                      'VID',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         },
