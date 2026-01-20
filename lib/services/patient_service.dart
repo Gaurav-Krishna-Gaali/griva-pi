@@ -1,8 +1,7 @@
 import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import 'package:intl/intl.dart';
-
-import '../db/app_database.dart';
-import '../db/daos/patient_dao.dart';
 
 class Patient {
   final int? id;
@@ -275,31 +274,259 @@ class Patient {
 }
 
 class PatientService {
-  static final AppDatabase _db = AppDatabase();
-  static final PatientDao _dao = PatientDao(_db);
+  static Database? _database;
+  static const String tableName = 'patients';
+
+  Future<void> checkDatabaseState() async {
+    try {
+      final db = await database;
+      final tables = await db.query('sqlite_master', where: 'type = ?', whereArgs: ['table']);
+      print('Available tables: ${tables.map((t) => t['name']).toList()}');
+      
+      final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName'));
+      print('Number of patients in database: $count');
+    } catch (e) {
+      print('Error checking database state: $e');
+    }
+  }
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    await checkDatabaseState();
+    return _database!;
+  }
+
+  Future<Database> _initDatabase() async {
+    try {
+      String path = join(await getDatabasesPath(), 'patient_database.db');
+      print('Initializing database at path: $path'); // Debug log
+      
+      return await openDatabase(
+        path,
+        version: 3, // Updated to version 3 to include examination images
+        onCreate: (Database db, int version) async {
+          print('Creating new database...'); // Debug log
+          await db.execute('''
+            CREATE TABLE $tableName(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              patient_name TEXT NOT NULL,
+              patient_id TEXT,
+              date_of_birth TEXT,
+              date_of_visit TEXT,
+              mobile_no TEXT NOT NULL,
+              email TEXT,
+              address TEXT,
+              doctor_name TEXT,
+              referred_by TEXT,
+              smoking TEXT,
+              blood_group TEXT,
+              medication TEXT,
+              allergies TEXT,
+              menopause TEXT,
+              last_menstrual_date TEXT,
+              sexually_active TEXT,
+              contraception TEXT,
+              hiv_status TEXT,
+              pregnant TEXT,
+              live_births INTEGER,
+              still_births INTEGER,
+              abortions INTEGER,
+              cesareans INTEGER,
+              miscarriages INTEGER,
+              hpv_vaccination TEXT,
+              referral_reason TEXT,
+              symptoms TEXT,
+              hpv_test TEXT,
+              hpv_result TEXT,
+              hpv_date TEXT,
+              hcg_test TEXT,
+              hcg_date TEXT,
+              hcg_level REAL,
+              patient_summary TEXT,
+              created_at TEXT,
+              updated_at TEXT,
+              chief_complaint TEXT,
+              cytology_report TEXT,
+              pathological_report TEXT,
+              colposcopy_findings TEXT,
+              final_impression TEXT,
+              remarks TEXT,
+              treatment_provided TEXT,
+              precautions TEXT,
+              examining_physician TEXT,
+              forensic_examination TEXT,
+              examination_images TEXT,
+              image_metadata TEXT
+            )
+          ''');
+          
+          // Create users table
+          await db.execute('''
+            CREATE TABLE users(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              full_name TEXT NOT NULL,
+              email TEXT UNIQUE NOT NULL,
+              password TEXT NOT NULL,
+              medical_license TEXT NOT NULL,
+              hospital TEXT NOT NULL,
+              role TEXT DEFAULT 'pending',
+              is_active INTEGER DEFAULT 0,
+              last_login TEXT,
+              created_at TEXT,
+              updated_at TEXT,
+              profile_image TEXT,
+              phone_number TEXT,
+              specialization TEXT,
+              department TEXT
+            )
+          ''');
+          
+          // Insert default admin user
+          final now = DateTime.now().toIso8601String();
+          final adminUser = {
+            'full_name': 'System Administrator',
+            'email': 'admin@griva.com',
+            'password': 'admin123',
+            'medical_license': 'ADMIN001',
+            'hospital': 'Griva Medical Systems',
+            'role': 'admin',
+            'is_active': 1,
+            'created_at': now,
+            'updated_at': now,
+          };
+          
+          try {
+            await db.insert('users', adminUser);
+          } catch (e) {
+            print('Admin user might already exist: $e');
+          }
+          
+          print('Database tables created successfully'); // Debug log
+        },
+        onUpgrade: (Database db, int oldVersion, int newVersion) async {
+          print('Upgrading database from version $oldVersion to $newVersion');
+          if (oldVersion < 2) {
+            // Create users table for existing databases
+            await db.execute('''
+              CREATE TABLE users(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                medical_license TEXT NOT NULL,
+                hospital TEXT NOT NULL,
+                role TEXT DEFAULT 'pending',
+                is_active INTEGER DEFAULT 0,
+                last_login TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                profile_image TEXT,
+                phone_number TEXT,
+                specialization TEXT,
+                department TEXT
+              )
+            ''');
+            
+            // Insert default admin user
+            final now = DateTime.now().toIso8601String();
+            final adminUser = {
+              'full_name': 'System Administrator',
+              'email': 'admin@griva.com',
+              'password': 'admin123',
+              'medical_license': 'ADMIN001',
+              'hospital': 'Griva Medical Systems',
+              'role': 'admin',
+              'is_active': 1,
+              'created_at': now,
+              'updated_at': now,
+            };
+            
+            try {
+              await db.insert('users', adminUser);
+            } catch (e) {
+              print('Admin user might already exist: $e');
+            }
+            
+            print('Users table created and admin user inserted');
+          }
+          
+          if (oldVersion < 3) {
+            // Add examination images columns
+            await db.execute('ALTER TABLE $tableName ADD COLUMN examination_images TEXT');
+            await db.execute('ALTER TABLE $tableName ADD COLUMN image_metadata TEXT');
+            print('Examination images columns added');
+          }
+        },
+        onOpen: (db) {
+          print('Database opened successfully'); // Debug log
+        },
+      );
+    } catch (e) {
+      print('Error initializing database: $e'); // Error log
+      rethrow;
+    }
+  }
 
   Future<List<Patient>> getAllPatients() async {
-    return _dao.getAllPatients();
+    final db = await database;
+    await _addMissingColumns(db);
+    final List<Map<String, dynamic>> maps = await db.query(tableName, orderBy: 'updated_at DESC');
+    return List.generate(maps.length, (i) => Patient.fromMap(maps[i]));
   }
 
   Future<Patient> getPatient(int id) async {
-    return _dao.getPatient(id);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) {
+      throw Exception('Patient not found');
+    }
+    return Patient.fromMap(maps.first);
   }
 
   Future<Patient> createPatient(Patient patient) async {
-    return _dao.createPatient(patient);
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final patientMap = patient.toMap()
+      ..remove('id')
+      ..['created_at'] = now
+      ..['updated_at'] = now;
+
+    final id = await db.insert(tableName, patientMap);
+    return getPatient(id);
   }
 
   Future<Patient> updatePatient(int id, Patient patient) async {
-    return _dao.updatePatient(id, patient);
+    final db = await database;
+    final patientMap = patient.toMap()
+      ..remove('id')
+      ..['updated_at'] = DateTime.now().toIso8601String();
+
+    await db.update(
+      tableName,
+      patientMap,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return getPatient(id);
   }
 
   Future<void> deletePatient(int id) async {
-    await _dao.deletePatient(id);
+    final db = await database;
+    await db.delete(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> insertSamplePatients() async {
-    final count = (await _dao.getAllPatients()).length;
+    final db = await database;
+    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
     if (count == 0) {
       final now = DateTime.now();
       final patients = [
@@ -326,17 +553,47 @@ class PatientService {
         ),
       ];
       for (final patient in patients) {
-        await _dao.createPatient(patient);
+        await createPatient(patient);
+      }
+    }
+  }
+
+  Future<void> _addMissingColumns(Database db) async {
+    List<String> columns = (await db.rawQuery('PRAGMA table_info($tableName)'))
+        .map((row) => row['name'] as String)
+        .toList();
+
+    Map<String, String> newColumns = {
+      'chief_complaint': 'TEXT',
+      'cytology_report': 'TEXT',
+      'pathological_report': 'TEXT',
+      'colposcopy_findings': 'TEXT',
+      'final_impression': 'TEXT',
+      'remarks': 'TEXT',
+      'treatment_provided': 'TEXT',
+      'precautions': 'TEXT',
+      'examining_physician': 'TEXT',
+      'forensic_examination': 'TEXT'
+    };
+
+    for (var col in newColumns.entries) {
+      if (!columns.contains(col.key)) {
+        await db.execute('ALTER TABLE $tableName ADD COLUMN ${col.key} ${col.value}');
       }
     }
   }
 
   Future<void> deleteAllPatients() async {
-    await _dao.deleteAllPatients();
+    final db = await database;
+    await db.delete(
+      tableName,
+      where: '1 = 1',
+    );
   }
 
   // Add examination image to patient
   Future<void> addExaminationImage(int patientId, String imagePath, Map<String, dynamic>? metadata) async {
+    final db = await database;
     final patient = await getPatientById(patientId);
     if (patient == null) return;
 
@@ -351,11 +608,21 @@ class PatientService {
       currentMetadata[imagePath] = metadata;
     }
 
-    await _dao.updateExaminationImages(patientId, currentImages, currentMetadata);
+    await db.update(
+      tableName,
+      {
+        'examination_images': jsonEncode(currentImages),
+        'image_metadata': jsonEncode(currentMetadata),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
   }
 
   // Remove examination image from patient
   Future<void> removeExaminationImage(int patientId, String imagePath) async {
+    final db = await database;
     final patient = await getPatientById(patientId);
     if (patient == null) return;
 
@@ -368,7 +635,16 @@ class PatientService {
     // Remove metadata for this image
     currentMetadata.remove(imagePath);
 
-    await _dao.updateExaminationImages(patientId, currentImages, currentMetadata);
+    await db.update(
+      tableName,
+      {
+        'examination_images': jsonEncode(currentImages),
+        'image_metadata': jsonEncode(currentMetadata),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
   }
 
   // Get all examination images for a patient
@@ -379,6 +655,16 @@ class PatientService {
 
   // Get patient by ID
   Future<Patient?> getPatientById(int id) async {
-    return _dao.getPatientById(id);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Patient.fromMap(maps.first);
+    }
+    return null;
   }
 } 

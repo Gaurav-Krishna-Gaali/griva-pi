@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:io' show Platform;
+import 'package:sqflite/sqflite.dart';
 import 'login_page.dart';
 import 'launch_screen.dart';
 
@@ -7,7 +10,15 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
+  // Initialize database based on platform
+  if (Platform.isWindows || Platform.isLinux) {
+    // Initialize FFI for desktop
+    sqfliteFfiInit();
+    // Change the default factory
+    databaseFactory = databaseFactoryFfi;
+  }
+  
   // video_player_win automatically provides Windows support when both
   // video_player and video_player_win are in pubspec.yaml
   // No explicit initialization needed - it works via plugin registration

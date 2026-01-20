@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:video_player/video_player.dart';
-import 'dart:io';
-import 'dart:typed_data';
-
 import '../services/patient_service.dart';
-import '../services/image_service.dart';
-import '../services/video_service.dart';
+import 'patient_form_screen.dart';
 import '../new_patient_form.dart';
+import 'dart:io';
 import '../widgets/centralized_footer.dart';
 import '../custom_app_bar.dart';
 import 'patient_details_screen.dart';
@@ -27,9 +23,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
   bool _isLoading = true;
   String? _error;
   Patient? _selectedPatient;
-  Future<List<String>>? _previewImagePathsFuture;
-  Future<List<String>>? _previewVideoPathsFuture;
-  final Map<int, VideoPlayerController> _previewVideoControllers = {};
 
   final TextEditingController _searchController = TextEditingController();
   String _timeFilter = 'All time';
@@ -39,13 +32,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
   void initState() {
     super.initState();
     _loadPatients();
-  }
-
-  @override
-  void dispose() {
-    _disposePreviewVideoControllers();
-    _searchController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadPatients() async {
@@ -68,88 +54,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
     }
   }
 
-  void _disposePreviewVideoControllers() {
-    for (final controller in _previewVideoControllers.values) {
-      controller.dispose();
-    }
-    _previewVideoControllers.clear();
-  }
-
-  Widget _buildStaticVideoTile({bool isLoading = false}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.deepPurple.withOpacity(0.3),
-        ),
-      ),
-      child: Stack(
-        children: [
-          Center(
-            child: isLoading
-                ? const CircularProgressIndicator(strokeWidth: 2)
-                : const Icon(
-                    Icons.videocam,
-                    color: Colors.deepPurple,
-                    size: 36,
-                  ),
-          ),
-          Positioned(
-            top: 6,
-            left: 6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.deepPurple,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                'VID',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _initializePreviewVideoController(
-    int index,
-    String videoPath,
-  ) async {
-    if (_previewVideoControllers.containsKey(index)) return;
-
-    try {
-      if (Platform.isLinux) {
-        // No video playback thumbnails on Linux; rely on static icon.
-        return;
-      }
-
-      final controller = VideoPlayerController.file(File(videoPath));
-      await controller.initialize();
-      controller.setLooping(true);
-      await controller.play();
-
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-
-      setState(() {
-        _previewVideoControllers[index] = controller;
-      });
-    } catch (e) {
-      // Fallback to static icon if anything fails.
-      debugPrint('Error initializing preview video controller: $e');
-    }
-  }
-
   Future<void> _navigateToAddPatient() async {
     final result = await Navigator.push(
       context,
@@ -162,7 +66,54 @@ class _PatientListScreenState extends State<PatientListScreen> {
     }
   }
 
-  // Note: edit/delete actions are handled in the details screen and/or other flows.
+  Future<void> _navigateToEditPatient(Patient patient) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PatientFormScreen(patient: patient),
+      ),
+    );
+    if (result == true) {
+      _loadPatients();
+    }
+  }
+
+  Future<void> _deletePatient(Patient patient) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Patient'),
+        content: Text('Are you sure you want to delete ${patient.patientName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _patientService.deletePatient(patient.id!);
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context, true);
+        } else {
+          _loadPatients();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting patient: $e')),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -378,7 +329,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       result = result.where((p) {
         final name = p.patientName.toLowerCase();
         final id = (p.patientId ?? '').toString().toLowerCase();
-        final mobile = p.mobileNo.toString().toLowerCase();
+        final mobile = (p.mobileNo ?? '').toString().toLowerCase();
         return name.contains(query) || id.contains(query) || mobile.contains(query);
       });
     }
@@ -524,21 +475,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   final p = rows[index];
                   final isSelected = _selectedPatient?.id == p.id;
                   return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _disposePreviewVideoControllers();
-                        _selectedPatient = p;
-                        if (p.id == null) {
-                          _previewImagePathsFuture = Future.value(<String>[]);
-                          _previewVideoPathsFuture = Future.value(<String>[]);
-                        } else {
-                          _previewImagePathsFuture =
-                              ImageService.getPatientImages(p.id!);
-                          _previewVideoPathsFuture =
-                              VideoService.getPatientVideos(p.id!);
-                        }
-                      });
-                    },
+                    onTap: () => setState(() => _selectedPatient = p),
                     child: Container(
                       color: isSelected ? const Color(0xFFF1F5FF) : Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -591,14 +528,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     }
 
     final p = _selectedPatient!;
-    _previewImagePathsFuture ??= (p.id == null)
-        ? Future.value(<String>[])
-        : ImageService.getPatientImages(p.id!);
-    _previewVideoPathsFuture ??= (p.id == null)
-        ? Future.value(<String>[])
-        : VideoService.getPatientVideos(p.id!);
-
-    return Card(
+        return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade300)),
       child: Padding(
@@ -619,7 +549,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
               runSpacing: 8,
               children: [
                 if (p.patientId != null) Text('ID: ${p.patientId}'),
-                if (p.mobileNo.toString().trim().isNotEmpty) Text('Mobile: ${p.mobileNo}'),
+                if (p.mobileNo != null) Text('Mobile: ${p.mobileNo}'),
                 if (p.dateOfVisit != null) Text('Visit: ${p.dateOfVisit!.toLocal().toString().split(' ')[0]}'),
               ],
             ),
@@ -630,179 +560,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   color: Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: FutureBuilder<List<List<String>>>(
-                  future: Future.wait<List<String>>([
-                    _previewImagePathsFuture ?? Future.value(<String>[]),
-                    _previewVideoPathsFuture ?? Future.value(<String>[]),
-                  ]),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    final images = (snapshot.data != null && snapshot.data!.isNotEmpty)
-                        ? snapshot.data![0]
-                        : const <String>[];
-                    final videos = (snapshot.data != null && snapshot.data!.length > 1)
-                        ? snapshot.data![1]
-                        : const <String>[];
-
-                    // Combine most-recent-first, capped for performance.
-                    final recentImages = images.reversed.take(4).toList();
-                    final recentVideos = videos.reversed.take(3).toList();
-                    final total = recentImages.length + recentVideos.length;
-
-                    if (total == 0) {
-                      return const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.perm_media_outlined,
-                              size: 64,
-                              color: Colors.deepPurple,
-                            ),
-                            SizedBox(height: 8),
-                            Text('No examination media yet'),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemCount: total,
-                        itemBuilder: (context, index) {
-                          final isImage = index < recentImages.length;
-                          if (isImage) {
-                            final imagePath = recentImages[index];
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: FutureBuilder<Uint8List?>(
-                                future: ImageService.loadImage(imagePath),
-                                builder: (context, imgSnap) {
-                                  if (imgSnap.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return Container(
-                                      color: Colors.white,
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      ),
-                                    );
-                                  }
-                                  if (imgSnap.hasError || imgSnap.data == null) {
-                                    return Container(
-                                      color: Colors.white,
-                                      child: const Center(
-                                        child: Icon(Icons.broken_image,
-                                            color: Colors.deepPurple),
-                                      ),
-                                    );
-                                  }
-                                  return Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      Image.memory(
-                                        imgSnap.data!,
-                                        fit: BoxFit.cover,
-                                      ),
-                                      Positioned(
-                                        top: 6,
-                                        left: 6,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.deepPurple,
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          child: const Text(
-                                            'IMG',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            );
-                          }
-
-                          // Video tile with motion thumbnail when supported.
-                          final videoIndex = index - recentImages.length;
-                          final videoPath = recentVideos[videoIndex];
-
-                          // For Linux or if something goes wrong, show static fallback.
-                          if (Platform.isLinux) {
-                            return _buildStaticVideoTile();
-                          }
-
-                          _initializePreviewVideoController(
-                            videoIndex,
-                            videoPath,
-                          );
-
-                          final controller =
-                              _previewVideoControllers[videoIndex];
-                          if (controller == null ||
-                              !controller.value.isInitialized) {
-                            return _buildStaticVideoTile(isLoading: true);
-                          }
-
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                FittedBox(
-                                  fit: BoxFit.cover,
-                                  child: SizedBox(
-                                    width: controller.value.size.width,
-                                    height: controller.value.size.height,
-                                    child: VideoPlayer(controller),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 6,
-                                  left: 6,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      'VID',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
+                child: const Center(
+                  child: Icon(Icons.photo_library_outlined, size: 64, color: Colors.deepPurple),
                 ),
               ),
             ),
@@ -862,7 +621,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       for (final p in _applyFilters(_patients)) {
         final date = p.dateOfVisit?.toIso8601String() ?? '';
         final id = p.patientId?.toString() ?? '';
-        final mobile = p.mobileNo.toString();
+        final mobile = p.mobileNo?.toString() ?? '';
         buffer.writeln('"${p.patientName}","$id","$mobile","$date"');
       }
 

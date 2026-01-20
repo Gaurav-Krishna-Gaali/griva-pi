@@ -1,7 +1,8 @@
+import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import 'package:intl/intl.dart';
-
-import '../db/app_database.dart';
-import '../db/daos/user_dao.dart';
+import 'patient_service.dart';
 
 class User {
   final int? id;
@@ -129,77 +130,204 @@ class User {
 }
 
 class UserService {
-  static final AppDatabase _db = AppDatabase();
-  static final UserDao _dao = UserDao(_db);
+  static const String tableName = 'users';
+
+  Future<Database> get database async {
+    // Use the same database instance as PatientService
+    final patientService = PatientService();
+    return await patientService.database;
+  }
 
   // Authentication methods
   Future<User?> authenticateUser(String email, String password) async {
-    return _dao.authenticateUser(email, password);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'email = ? AND password = ? AND is_active = 1',
+      whereArgs: [email, password],
+    );
+
+    if (maps.isEmpty) return null;
+    
+    final user = User.fromMap(maps.first);
+    
+    // Update last login
+    await updateLastLogin(user.id!);
+    
+    return user;
   }
 
   Future<void> updateLastLogin(int userId) async {
-    await _dao.updateLastLogin(userId);
+    final db = await database;
+    await db.update(
+      tableName,
+      {'last_login': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   // User management methods
   Future<User> createUser(User user) async {
-    return _dao.createUser(user);
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final userMap = user.toMap()
+      ..remove('id')
+      ..['created_at'] = now
+      ..['updated_at'] = now;
+
+    final id = await db.insert(tableName, userMap);
+    return getUser(id);
   }
 
   Future<User> getUser(int id) async {
-    return _dao.getUser(id);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) {
+      throw Exception('User not found');
+    }
+    return User.fromMap(maps.first);
   }
 
   Future<User?> getUserByEmail(String email) async {
-    return _dao.getUserByEmail(email);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
   }
 
   Future<List<User>> getAllUsers() async {
-    return _dao.getAllUsers();
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      orderBy: 'created_at DESC',
+    );
+    return List.generate(maps.length, (i) => User.fromMap(maps[i]));
   }
 
   Future<List<User>> getPendingUsers() async {
-    return _dao.getPendingUsers();
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'role = ?',
+      whereArgs: ['pending'],
+      orderBy: 'created_at DESC',
+    );
+    return List.generate(maps.length, (i) => User.fromMap(maps[i]));
   }
 
   Future<User> updateUser(int id, User user) async {
-    return _dao.updateUser(id, user);
+    final db = await database;
+    final userMap = user.toMap()
+      ..remove('id')
+      ..['updated_at'] = DateTime.now().toIso8601String();
+
+    await db.update(
+      tableName,
+      userMap,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return getUser(id);
   }
 
   Future<void> approveUser(int userId) async {
-    await _dao.approveUser(userId);
+    final db = await database;
+    await db.update(
+      tableName,
+      {
+        'role': 'doctor',
+        'is_active': 1,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   Future<void> rejectUser(int userId) async {
-    await _dao.rejectUser(userId);
+    final db = await database;
+    await db.delete(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   Future<void> deactivateUser(int userId) async {
-    await _dao.deactivateUser(userId);
+    final db = await database;
+    await db.update(
+      tableName,
+      {
+        'is_active': 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   Future<void> deleteUser(int userId) async {
-    await _dao.deleteUser(userId);
+    final db = await database;
+    await db.delete(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   Future<bool> emailExists(String email) async {
-    return _dao.emailExists(email);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    return maps.isNotEmpty;
   }
 
   Future<void> changePassword(int userId, String newPassword) async {
-    await _dao.changePassword(userId, newPassword);
+    final db = await database;
+    await db.update(
+      tableName,
+      {
+        'password': newPassword,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   // Admin methods
   Future<List<User>> getUsersByRole(String role) async {
-    return _dao.getUsersByRole(role);
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'role = ?',
+      whereArgs: [role],
+      orderBy: 'created_at DESC',
+    );
+    return List.generate(maps.length, (i) => User.fromMap(maps[i]));
   }
 
   Future<int> getUserCount() async {
-    return _dao.getUserCount();
+    final db = await database;
+    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
   }
 
   Future<int> getActiveUserCount() async {
-    return _dao.getActiveUserCount();
+    final db = await database;
+    return Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM $tableName WHERE is_active = 1')
+    ) ?? 0;
   }
 } 
