@@ -576,62 +576,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     );
   }
 
-  Widget _buildVisitCard(String title, String date, String diagnosis,
-      String notes, String followUp) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildVisitInfo('Date', date),
-          const SizedBox(height: 8),
-          _buildVisitInfo('Diagnosis', diagnosis),
-          const SizedBox(height: 8),
-          _buildVisitInfo('Notes', notes),
-          const SizedBox(height: 8),
-          _buildVisitInfo('Follow-up', followUp),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => _showReportsForPatient(),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF8B44F7)),
-                foregroundColor: const Color(0xFF8B44F7),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: const Text('View Reports'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildReportDrivenVisitHistory() {
     if (_isLoadingReports) {
       return const Padding(
@@ -645,12 +589,19 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     }
 
     if (_reportFiles.isEmpty) {
-      return _buildVisitCard(
-        _patient.dateOfVisit != null ? 'Colposcopy Examination' : 'Visit Details',
-        _formatDate(_patient.dateOfVisit),
-        _patient.finalImpression ?? _patient.colposcopyFindings ?? 'Not recorded',
-        _patient.remarks ?? 'No additional notes recorded',
-        _patient.precautions ?? 'Follow-up not specified',
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'No reports found for this patient',
+            style: TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
       );
     }
 
@@ -825,108 +776,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
-
-  Future<void> _showReportsForPatient() async {
-    try {
-      final reports =
-          await MedicalReportService.listReportsForPatient(_patient);
-
-      if (!mounted) return;
-
-      if (reports.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No reports found for this patient'),
-          ),
-        );
-        return;
-      }
-
-      await showModalBottomSheet<void>(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        builder: (context) {
-          return SafeArea(
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.picture_as_pdf,
-                          color: Color(0xFF8B44F7)),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Patient Reports',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${reports.length}',
-                        style: const TextStyle(
-                          color: Color(0xFF8B44F7),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: reports.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final file = reports[index];
-                        final name = file.path.split(Platform.pathSeparator).last;
-                        return ListTile(
-                          leading: const Icon(Icons.picture_as_pdf,
-                              color: Colors.redAccent),
-                          title: Text(
-                            name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () async {
-                            Navigator.pop(context);
-                            if (!mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ReportPdfViewerScreen(
-                                  filePath: file.path,
-                                  title: name,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load reports: $e'),
-        ),
-      );
-    }
   }
 
   Widget _buildExaminationImagesGrid() {
