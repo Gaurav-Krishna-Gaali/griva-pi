@@ -10,6 +10,7 @@ import 'package:path/path.dart' as path;
 import 'services/pdf_service.dart';
 import 'services/patient_service.dart';
 import 'services/image_service.dart';
+import 'services/video_service.dart';
 import 'image_edit_screen.dart';
 import 'screens/patient_selection_screen.dart';
 import 'screens/image_comparison_screen.dart';
@@ -396,6 +397,109 @@ class _GalleryScreenState extends State<GalleryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error linking images: $e")),
+        );
+      }
+    }
+  }
+
+  // Link unlinked videos to a patient (filesystem only)
+  Future<void> _linkVideosToPatient() async {
+    if (_unlinkedVideos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No unlinked videos to save')),
+      );
+      return;
+    }
+
+    try {
+      final patients = await _patientService.getAllPatients();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title:
+                  Text('Link ${_unlinkedVideos.length} Videos to Patient'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 300,
+                child: ListView.builder(
+                  itemCount: patients.length,
+                  itemBuilder: (context, index) {
+                    final patient = patients[index];
+                    return ListTile(
+                      title: Text(patient.patientName),
+                      subtitle:
+                          Text('ID: ${patient.patientId ?? 'N/A'}'),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        await _saveUnlinkedVideosToPatient(patient);
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      print('Error loading patients for videos: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error loading patients: $e")),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveUnlinkedVideosToPatient(Patient patient) async {
+    try {
+      for (final videoData in _unlinkedVideos) {
+        final videoBytes = videoData['bytes'] as Uint8List;
+        // metadata is currently not persisted, but kept for future use
+        final metadata =
+            (videoData['metadata'] as Map<String, dynamic>?);
+
+        await VideoService.saveExaminationVideo(
+          videoBytes,
+          patient.id!,
+          metadata: metadata,
+        );
+      }
+
+      final savedCount = _unlinkedVideos.length;
+
+      setState(() {
+        _unlinkedVideos.clear();
+      });
+
+      print(
+        'All unlinked videos saved successfully for patient: ${patient.patientName}',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "$savedCount videos linked to ${patient.patientName}",
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error saving unlinked videos to patient: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error linking videos: $e")),
         );
       }
     }
@@ -1069,14 +1173,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             Text(
                               '${_selectedIndices.length + _selectedVideoIndices.length}/${_images.length + _videos.length} Selected for Report',
                               style: const TextStyle(
-                                color: Color(0xFF6B46C1), // Purple color
+                                color: Color(0xFF6B46C1),
                                 fontWeight: FontWeight.w500,
                                 fontSize: 14,
                               ),
                             ),
                           ],
                         ),
-                        if (_unlinkedImages.isNotEmpty) ...[
+                        if (_unlinkedImages.isNotEmpty ||
+                            _unlinkedVideos.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
@@ -1108,6 +1213,42 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                   minimumSize: const Size(0, 28),
                                 ),
                               ),
+                              if (_unlinkedVideos.isNotEmpty) ...[
+                                const SizedBox(width: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.06),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color:
+                                          Colors.blueAccent.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${_unlinkedVideos.length} unlinked videos',
+                                    style: const TextStyle(
+                                      color: Colors.blueAccent,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.movie, size: 16),
+                                  label: const Text('Link Videos'),
+                                  onPressed: _linkVideosToPatient,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blueAccent,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    minimumSize: const Size(0, 28),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ],
