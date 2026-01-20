@@ -6,7 +6,7 @@ import 'exam_screen.dart';
 import 'screens/patient_list_screen.dart';
 import 'services/patient_service.dart';
 import 'services/user_service.dart';
-import 'screens/patient_form_screen.dart';
+import 'screens/patient_details_screen.dart';
 import 'screens/user_profile_screen.dart';
 import 'main.dart';
 import 'login_page.dart';
@@ -602,7 +602,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
                     final updated = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PatientFormScreen(patient: patient),
+                        builder: (context) => PatientDetailsScreen(patient: patient),
                       ),
                     );
                     if (updated == true) {
