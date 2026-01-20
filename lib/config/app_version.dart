@@ -1,6 +1,6 @@
 class AppVersion {
   // Update this version number when pushing new Shorebird patches
-  static const String version = '1.1.2';
+  static const String version = '1.1.3';
   static const String buildNumber = '1';
   
   // Get full version string

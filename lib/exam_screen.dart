@@ -877,9 +877,9 @@ class _PiCameraScreenState extends State<PiCameraScreen>
     // Store context for Socket.IO triggered actions
     _currentContext = context;
     
-    // final streamUrl = AppConfig.mjpegStreamUrl;
+    final streamUrl = AppConfig.mjpegStreamUrl;
     // final streamUrl = AppConfig.altCamUrl;
-    final streamUrl = AppConfig.videoFeedUrl;
+    // final streamUrl = AppConfig.videoFeedUrl;
 
     return Scaffold(
       backgroundColor: Colors.black,
