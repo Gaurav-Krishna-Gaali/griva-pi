@@ -12,6 +12,7 @@ import '../gallery_screen.dart';
 import '../new_patient_form.dart';
 import 'report_pdf_viewer_screen.dart';
 
+
 class PatientDetailsScreen extends StatefulWidget {
   final Patient patient;
 
@@ -30,6 +31,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   List<String> _examinationVideos = [];
   bool _isLoadingVideos = true;
   final GlobalKey _imagesSectionKey = GlobalKey();
+  List<File> _reportFiles = [];
+  Map<String, Map<String, dynamic>?> _reportMetaByPath = {};
+  bool _isLoadingReports = true;
 
   @override
   void initState() {
@@ -37,6 +41,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     _patient = widget.patient;
     _loadExaminationImages();
     _loadExaminationVideos();
+    _loadReportVisits();
   }
 
   Future<void> _loadExaminationImages() async {
@@ -65,6 +70,27 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
       print('Error loading examination videos: $e');
       setState(() {
         _isLoadingVideos = false;
+      });
+    }
+  }
+
+  Future<void> _loadReportVisits() async {
+    try {
+      final reports = await MedicalReportService.listReportsForPatient(_patient);
+      final metaMap = <String, Map<String, dynamic>?>{};
+      for (final f in reports) {
+        metaMap[f.path] = await MedicalReportService.readReportMetadata(f.path);
+      }
+      if (!mounted) return;
+      setState(() {
+        _reportFiles = reports.reversed.toList(); // newest first
+        _reportMetaByPath = metaMap;
+        _isLoadingReports = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingReports = false;
       });
     }
   }
@@ -406,23 +432,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
               const SizedBox(height: 16),
 
               // Visit History Cards
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildVisitCard(
-                      _patient.dateOfVisit != null
-                          ? 'Colposcopy Examination'
-                          : 'Visit Details',
-                      _formatDate(_patient.dateOfVisit),
-                      _patient.finalImpression ??
-                          _patient.colposcopyFindings ??
-                          'Not recorded',
-                      _patient.remarks ?? 'No additional notes recorded',
-                      _patient.precautions ?? 'Follow-up not specified',
-                    ),
-                  ),
-                ],
-              ),
+              _buildReportDrivenVisitHistory(),
 
               const SizedBox(height: 24),
             ],
@@ -647,6 +657,173 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReportDrivenVisitHistory() {
+    if (_isLoadingReports) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B44F7)),
+          ),
+        ),
+      );
+    }
+
+    if (_reportFiles.isEmpty) {
+      return _buildVisitCard(
+        _patient.dateOfVisit != null ? 'Colposcopy Examination' : 'Visit Details',
+        _formatDate(_patient.dateOfVisit),
+        _patient.finalImpression ?? _patient.colposcopyFindings ?? 'Not recorded',
+        _patient.remarks ?? 'No additional notes recorded',
+        _patient.precautions ?? 'Follow-up not specified',
+      );
+    }
+
+    // Infinite list feel inside a scroll view: render all report cards; list can grow without changing UI structure.
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _reportFiles.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final file = _reportFiles[index];
+        final meta = _reportMetaByPath[file.path];
+
+        final generatedAtMs = (meta?['generatedAtMs'] as num?)?.toInt();
+        final visitDate = generatedAtMs != null
+            ? _formatDate(DateTime.fromMillisecondsSinceEpoch(generatedAtMs))
+            : file.lastModifiedSync().toLocal().toString().split(' ')[0];
+
+        final finalImpression = (meta?['finalImpression'] as String?)?.trim();
+        final chiefComplaint = (meta?['chiefComplaint'] as String?)?.trim();
+        final remarks = (meta?['remarks'] as String?)?.trim();
+        final precautions = (meta?['precautions'] as String?)?.trim();
+        final imageCount = (meta?['imageCount'] as num?)?.toInt();
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Visit ${_reportFiles.length - index}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    visitDate,
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (finalImpression != null && finalImpression.isNotEmpty)
+                _buildVisitInfo('Impression', finalImpression),
+              if (chiefComplaint != null && chiefComplaint.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildVisitInfo('Complaint', chiefComplaint),
+              ],
+              if (imageCount != null) ...[
+                const SizedBox(height: 6),
+                _buildVisitInfo('Images', '$imageCount'),
+              ],
+              if (remarks != null && remarks.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildVisitInfo('Notes', remarks),
+              ],
+              if (precautions != null && precautions.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildVisitInfo('Follow-up', precautions),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        // Scroll to the images section for this patient
+                        final ctx = _imagesSectionKey.currentContext;
+                        if (ctx != null) {
+                          Scrollable.ensureVisible(
+                            ctx,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF8B44F7)),
+                        foregroundColor: const Color(0xFF8B44F7),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      child: const Text('View Images'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReportPdfViewerScreen(
+                              filePath: file.path,
+                              title: file.path
+                                  .split(Platform.pathSeparator)
+                                  .last,
+                            ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF8B44F7)),
+                        foregroundColor: const Color(0xFF8B44F7),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      child: const Text('View Report'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

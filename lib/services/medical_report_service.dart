@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
@@ -12,6 +13,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'patient_service.dart';
 
 class MedicalReportService {
+  static const String _metadataSuffix = '.meta.json';
+
   static Future<String?> generateComprehensiveReport({
     required Patient patient,
     required List<Uint8List> images,
@@ -127,6 +130,34 @@ class MedicalReportService {
 
       // Save PDF
       await file.writeAsBytes(await pdf.save());
+
+      // Write metadata sidecar for visit history cards.
+      try {
+        final metaFile = File('${file.path}$_metadataSuffix');
+        final meta = <String, dynamic>{
+          'version': 1,
+          'generatedAtMs': timestamp,
+          'patientId': patient.id,
+          'patientName': patient.patientName,
+          'patientExternalId': patient.patientId,
+          'reportPath': file.path,
+          'imageCount': images.length,
+          'chiefComplaint': chiefComplaint,
+          'cytologyReport': cytologyReport,
+          'pathologicalReport': pathologicalReport,
+          'colposcopyFindings': colposcopyFindings,
+          'finalImpression': finalImpression,
+          'remarks': remarks,
+          'treatmentProvided': treatmentProvided,
+          'precautions': precautions,
+          'examiningPhysician': examiningPhysician,
+          'forensicExamination': forensicExamination,
+        };
+        await metaFile.writeAsString(jsonEncode(meta));
+      } catch (e) {
+        // Metadata is best-effort; report generation should still succeed.
+        print('Warning: failed to write report metadata: $e');
+      }
 
       return file.path;
     } catch (e) {
@@ -428,6 +459,20 @@ class MedicalReportService {
       }
     } catch (e) {
       throw Exception('Error opening report: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> readReportMetadata(String pdfPath) async {
+    try {
+      final metaFile = File('$pdfPath$_metadataSuffix');
+      if (!await metaFile.exists()) return null;
+      final raw = await metaFile.readAsString();
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return null;
+    } catch (e) {
+      print('Warning: failed to read report metadata: $e');
+      return null;
     }
   }
 }
